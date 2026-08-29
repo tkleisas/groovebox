@@ -13,3 +13,10 @@ os-image/customize/password.txt
 # OS / editor noise
 Thumbs.db
 .DS_Store
+
+# KiCad noise
+*-backups/
+*.kicad_pcb-bak
+*.kicad_sch-bak
+fp-info-cache
+

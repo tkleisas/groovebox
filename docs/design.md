@@ -127,16 +127,18 @@ keyboard's right end. The empty center holds the ВОКОИТЕР – ΟΡΓΑΝ
 
 | Peripheral | Connection | Role |
 |---|---|---|
-| HT16K33 | I2C @ 0x70 | 39-key matrix scan + 16 in-switch LEDs |
-| 2× ADS1115 | I2C @ 0x48 / 0x49 | 6 pots + slider + joystick (X/Y) |
+| HT16K33 | I2C @ 0x70 | 16 in-switch LEDs (driver only — rev A key scan moved to expanders) |
+| 3× ADS1115 | I2C @ 0x48 / 0x49 / 0x4a | 9 analog inputs: 6 pots + slider + joystick (X/Y) |
 | 4 encoders | direct GPIO (12 pins) | quadrature + push |
 
 Notes:
-- All buttons (16 white + 11 black + 3 transport + 4 soft + MODE + < + > +
-  2 SHIFT = 39 keys) are scanned by the HT16K33 matrix — exactly its 39-key
-  maximum; its LED driver runs the 16 in-switch step LEDs. **Every key has
-  a series diode** — the matrix has no ghosting prevention, and chords on
-  the keyboard would otherwise produce phantom keys.
+- All 39 keys (16 white + 11 black + 3 transport + 4 soft + MODE + < + > +
+  2 SHIFT) are **single-ended inputs on three MCP23017 I²C expanders** —
+  one uniform scan path, no matrix and no per-key diodes (rev A deviation
+  from the original HT16K33-matrix plan: the function keys are physically
+  distributed across the panel, and expanders keep the board-to-board link
+  at 4 wires with every key identical in hardware and firmware). The
+  HT16K33 remains solely as the driver for the 16 in-switch step LEDs.
 - Integrated mic: electret capsule wired to the WM8731 mic input (codec bias
   + PGA gain via ALSA mixer). Uses the codec's capture path, no extra bus or
   pins. The WM8731 runs in master mode off an onboard crystal since the Pi's

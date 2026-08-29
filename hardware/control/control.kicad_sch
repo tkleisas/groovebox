@@ -1,0 +1,18 @@
+(kicad_sch
+	(version 20231120)
+	(generator "eeschema")
+	(generator_version "8.0")
+	(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000001")
+	(paper "A3")
+	(title_block
+		(title "groovebox control board (panel module)")
+		(company "groovebox / ВОКОИТЕР")
+	)
+	(lib_symbols)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

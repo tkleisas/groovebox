@@ -1,0 +1,123 @@
+(kicad_pcb
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(general
+		(thickness 1.6)
+		(legacy_teardrops no)
+	)
+	(paper "A2")
+	(layers
+		(0 "F.Cu" signal)
+		(31 "B.Cu" signal)
+		(36 "B.SilkS" user "B.Silkscreen")
+		(37 "F.SilkS" user "F.Silkscreen")
+		(38 "B.Mask" user)
+		(39 "F.Mask" user)
+		(40 "Dwgs.User" user "User.Drawings")
+		(41 "Cmts.User" user "User.Comments")
+		(44 "Edge.Cuts" user)
+		(45 "Margin" user)
+	)
+	(setup
+		(pad_to_mask_clearance 0)
+	)
+	(net 0 "")
+	(gr_line
+		(start 0 0)
+		(end 356 0)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-00000000006d")
+	)
+	(gr_line
+		(start 356 0)
+		(end 356 62)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-00000000006e")
+	)
+	(gr_line
+		(start 356 62)
+		(end 0 62)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-00000000006f")
+	)
+	(gr_line
+		(start 0 62)
+		(end 0 0)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000070")
+	)
+	(gr_circle
+		(center 5 5)
+		(end 6.6 5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill none)
+		(layer "Edge.Cuts")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000071")
+	)
+	(gr_circle
+		(center 351 5)
+		(end 352.6 5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill none)
+		(layer "Edge.Cuts")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000072")
+	)
+	(gr_circle
+		(center 5 57)
+		(end 6.6 57)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill none)
+		(layer "Edge.Cuts")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000073")
+	)
+	(gr_circle
+		(center 351 57)
+		(end 352.6 57)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill none)
+		(layer "Edge.Cuts")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000074")
+	)
+	(gr_text
+		(at 178.0 68.0)
+		(layer "Cmts.User")
+		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000075")
+		(hide no)
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.3)
+			)
+		)
+		"keyboard board rev A - 356x62mm - 29 MX sockets + 16 LEDs - M3 at corners"
+	)
+)
