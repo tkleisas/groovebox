@@ -11,8 +11,10 @@ Channel 1 = panel → brain. Channel 2 = brain → panel (LEDs).
 
 ### Keys (39 total)
 
-Every panel key sends Note On (press, velocity = current slider value 1–127)
-and Note Off (release). Note number = 36 + key index.
+Every panel key sends Note On (press, velocity = current value of the
+configured **velocity source**, 1–127 — slider by default, see
+[Panel configuration](#panel-configuration-sysex-id-0x7d)) and Note Off
+(release). Note number = 36 + key index.
 
 | Index | Note | Key |
 |---|---|---|
@@ -37,7 +39,7 @@ logically identical, the brain may merge them.
 | 23 | pot DECAY |
 | 24 | pot SUSTAIN |
 | 25 | pot RELEASE |
-| 26 | data slider (live velocity for play mode) |
+| 26 | data slider (default velocity source — see Panel configuration) |
 | 1  | joystick Y (mod) |
 | pitch bend | joystick X (spring-returned, center = 8192) |
 
@@ -54,9 +56,61 @@ Note On/Off on channel 2, note number = LED index 0–15 (white-key LEDs).
 Velocity ignored for rev A (single intensity); velocities 1–127 may later
 map to PWM brightness.
 
+CC 27 on channel 2 is the **host velocity register**: the brain writes the
+live velocity value (1–127) it wants stamped on subsequent Note Ons while
+the velocity source is `host register` (see Panel configuration). All other
+channel-2 CCs are reserved.
+
+## Panel configuration (SysEx, ID 0x7D)
+
+Panel routing is host-configurable via vendor SysEx on the free
+non-commercial manufacturer ID `0x7D`. Configuration is **routing, not
+semantics**: the panel still only reports physical events — the brain merely
+chooses which physical value stamps Note On velocity. All musical meaning
+stays app-side (final section).
+
+Frame: `F0 7D 47 52 56 <cmd> [args…] F7` — `47 52 56` is ASCII `GRV`.
+
+| Cmd | Name | Args | Effect |
+|---|---|---|---|
+| 0x01 | SET_VELOCITY_SOURCE | `src` (+ `value` when `src` = 0x08) | velocity source for Note On, captured at the press instant |
+| 0x02 | QUERY | — | panel replies with 0x03 (below) |
+| 0x03 | REPLY | `proto_ver`, `feature_mask` | panel → brain: protocol version (currently 1) and capability bits |
+| 0x04 | SET_PERSISTENCE | `mode` | 0 = volatile (default), 1 = save-on-change |
+| 0x7F | RESET_DEFAULTS | — | velocity source = slider, persistence = volatile; erases any saved config |
+
+Velocity source codes for 0x01:
+
+| `src` | Meaning |
+|---|---|
+| 0x00 | data slider (power-up default — rev A behavior) |
+| 0x01–0x06 | pot 0–5 (the CC 20–25 sources) |
+| 0x07 | joystick Y (the CC 1 source) |
+| 0x08 | fixed value, next byte 1–127 |
+| 0x09 | host register (CC 27 on channel 2) |
+
+Feature mask bits (REPLY): bit 0 = velocity source assignment, bit 1 =
+config persistence, bit 2 = host velocity register. A brain that wants
+optional behavior gates on these bits, not on the version byte.
+
+Rules:
+
+- **Volatile by default.** With persistence off, the panel powers up with
+  velocity source = slider and no stored config. The brain re-sends its
+  configuration after the QUERY handshake at boot and on mode changes.
+- **Save-on-change.** With persistence on, each accepted config command is
+  written to flash and restored at power-up. The firmware coalesces writes
+  (at most one flash write per second of sustained changes) to spare the
+  flash; the brain should still avoid high-rate configuration streams.
+- **Unknown commands are ignored, never rejected** — a rev B panel may
+  accept commands an older brain does not know, and vice versa. QUERY plus
+  the feature bits is the discovery mechanism.
+- **Unknown `src` codes fall back to the slider**, never to a dead velocity.
+
 ## Semantics live in the brain
 
 The panel is dumb: it reports physical events, nothing more. Key → musical
-note mapping (scale/octave/play-vs-step mode), shift layers, velocity from
-slider, and all mode logic are app-side. This keeps the panel firmware
-stable and the behavior firmware-free.
+note mapping (scale/octave/play-vs-step mode), shift layers, velocity
+interpretation (the panel's source binding is mere routing — see Panel
+configuration), and all mode logic are app-side. This keeps the panel
+firmware stable and the behavior firmware-free.
