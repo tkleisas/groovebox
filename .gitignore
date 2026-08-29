@@ -7,8 +7,9 @@ panel-fw/build.log
 os-image/*.img.xz
 os-image/flash.log
 
-# Local credentials — never commit (hash lives in userconf.txt)
+# Local credentials — never commit (use userconf.txt.example)
 os-image/customize/password.txt
+os-image/customize/userconf.txt
 
 # OS / editor noise
 Thumbs.db

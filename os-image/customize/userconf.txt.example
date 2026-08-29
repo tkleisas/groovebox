@@ -1,0 +1,4 @@
+# Raspberry Pi Imager first-boot user config — per-device, NEVER committed.
+# Copy to userconf.txt and replace with your own hash before flashing.
+# Generate the hash with:  openssl passwd -6
+pi:$6$REPLACE_WITH_YOUR_OWN_HASH
