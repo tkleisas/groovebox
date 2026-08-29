@@ -1,5 +1,7 @@
 # Build output (CMake/MSVC) — regenerable
 emulator/build/
+panel-fw/build/
+panel-fw/build.log
 
 # Large Raspberry Pi OS images and flash logs
 os-image/*.img.xz

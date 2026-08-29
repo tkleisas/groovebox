@@ -1,0 +1,47 @@
+// groovebox-panel firmware entry point.
+// Superloop + 1 ms tick: USB MIDI via TinyUSB, HT16K33 key scan, 3x ADS1115
+// analog polling, quadrature encoders, LED output, GRV config service.
+
+#include "pico/stdlib.h"
+#include "hardware/i2c.h"
+#include "hardware/gpio.h"
+#include "tusb.h"
+
+#include "ads1115.h"
+#include "board_config.h"
+#include "config.h"
+#include "encoder.h"
+#include "leds.h"
+#include "matrix.h"
+#include "midi.h"
+
+int main(void) {
+    config_init();
+
+    i2c_init(PANEL_I2C, PANEL_I2C_BAUD);
+    gpio_set_function(PANEL_I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(PANEL_I2C_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(PANEL_I2C_SDA_PIN);
+    gpio_pull_up(PANEL_I2C_SCL_PIN);
+
+    leds_init();
+    matrix_init();
+    ads_init();
+    encoder_init();
+    tusb_init();
+
+    absolute_time_t next_tick = make_timeout_time_ms(1);
+    while (true) {
+        tud_task();
+        midi_task();
+        if (time_reached(next_tick)) {
+            next_tick = delayed_by_us(next_tick, 1000);
+            matrix_tick();
+            ads_tick();
+            encoder_tick();
+            leds_tick();
+            config_service();
+        }
+    }
+    return 0;
+}
