@@ -1,0 +1,3 @@
+[submodule "yawn"]
+	path = yawn
+	url = https://github.com/tkleisas/yawn

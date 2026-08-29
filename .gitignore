@@ -1,0 +1,13 @@
+# Build output (CMake/MSVC) — regenerable
+emulator/build/
+
+# Large Raspberry Pi OS images and flash logs
+os-image/*.img.xz
+os-image/flash.log
+
+# Local credentials — never commit (hash lives in userconf.txt)
+os-image/customize/password.txt
+
+# OS / editor noise
+Thumbs.db
+.DS_Store
