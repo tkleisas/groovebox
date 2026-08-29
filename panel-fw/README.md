@@ -11,14 +11,14 @@ LEDs and the host velocity register on ch2, GRV SysEx 0x7D configuration).
 
     CMakeLists.txt          build definition (pico-sdk 1.5.x)
     build.ps1               Windows build helper
-    src/board_config.h      pins, I2C addresses, keymap — PCB-facing constants
+    src/board_config.h      pins, I2C addresses, expander key maps — PCB-facing constants
     src/main.c              superloop + 1 ms tick
     src/usb_descriptors.c   "groovebox-panel" MIDI device (VID 0x2E8A, PID 0x4720)
     src/midi.c/.h           TX helpers + RX parser (ch2 notes/CC27/SysEx)
-    src/matrix.c/.h         HT16K33 13x3 key scan, 3-sample debounce
+    src/keys.c/.h           all 39 keys on 3x MCP23017, uniform debounced scan
     src/ads1115.c/.h        3 chips round-robin, ~83 Hz/channel, hysteresis
     src/encoder.c/.h        quadrature IRQ + 30 ms push debounce
-    src/leds.c/.h           16-LED RAM mapping + periodic re-assert
+    src/leds.c/.h           16-LED RAM mapping (HT16K33 LED driver) + re-assert
     src/config.c/.h         velocity source routing, GRV SysEx, flash persistence
 
 ## Building (Windows)

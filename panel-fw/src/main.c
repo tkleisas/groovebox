@@ -11,8 +11,8 @@
 #include "board_config.h"
 #include "config.h"
 #include "encoder.h"
+#include "keys.h"
 #include "leds.h"
-#include "matrix.h"
 #include "midi.h"
 
 int main(void) {
@@ -25,7 +25,7 @@ int main(void) {
     gpio_pull_up(PANEL_I2C_SCL_PIN);
 
     leds_init();
-    matrix_init();
+    keys_init();
     ads_init();
     encoder_init();
     tusb_init();
@@ -36,7 +36,7 @@ int main(void) {
         midi_task();
         if (time_reached(next_tick)) {
             next_tick = delayed_by_us(next_tick, 1000);
-            matrix_tick();
+            keys_tick();
             ads_tick();
             encoder_tick();
             leds_tick();

@@ -12,7 +12,7 @@ add_executable(panel
   src/main.c
   src/usb_descriptors.c
   src/midi.c
-  src/matrix.c
+  src/keys.c
   src/ads1115.c
   src/encoder.c
   src/leds.c
