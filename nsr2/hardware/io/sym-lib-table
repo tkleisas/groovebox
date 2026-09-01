@@ -1,0 +1,10 @@
+(sym_lib_table
+	(version 7)
+	(lib
+		(name "nsr2")
+		(type "KiCad")
+		(uri "${KIPRJMOD}/../nsr2.kicad_sym")
+		(options "")
+		(descr "NSR-2 project symbols (HT16K33A custom from the Holtek datasheet)")
+	)
+)

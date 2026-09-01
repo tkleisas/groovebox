@@ -1,0 +1,10 @@
+(fp_lib_table
+	(version 7)
+	(lib
+		(name "nsr2_fp")
+		(type "KiCad")
+		(uri "${KIPRJMOD}/../nsr2_footprints.pretty")
+		(options "")
+		(descr "NSR-2 custom footprints: Choc V1 hotswap (kiswitch, CC-BY-4.0), DIN5-RA-PTH (SparkFun-Connectors), generic SPDT slide (generated)")
+	)
+)
