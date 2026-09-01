@@ -74,3 +74,6 @@ reference for the audio engine bring-up and the panel protocol.
   [`nsr2/README.md`](nsr2/README.md) before hand-editing anything in
   `nsr2/hardware/`.
 - Per-device credentials never enter the repo (see `os-image/customize/`).
+- License: MIT (see [`LICENSE`](LICENSE)). Vendored third-party hardware
+  libraries keep their own licenses — see the footprints table in
+  [`nsr2/README.md`](nsr2/README.md).
