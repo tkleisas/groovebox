@@ -233,7 +233,7 @@ bool writeWidgetShowcasePng(const char* path) {
 
 bool writeThemesPng(const char* path) {
     constexpr int kLbl = 8;
-    constexpr int kH = 3 * (kLbl + kDisplayH); // label + page per theme
+    constexpr int kH = 5 * (kLbl + kDisplayH); // label + page per theme
     std::vector<uint16_t> big(size_t(kDisplayW) * kH, 0);
 
     // Representative SEQ page: pattern with accents/pitch marks, a
@@ -260,10 +260,11 @@ bool writeThemesPng(const char* path) {
 
     Ui ui;
     uint16_t page[kDisplayW * kDisplayH];
-    const ThemeId order[3] = {kThemeMono, kThemeRed, kThemeGreen};
+    const ThemeId order[5] = {kThemeMono, kThemeRed, kThemeGreen,
+                              kThemeAmber, kThemeArcade};
     Canvas565 c{big.data(), kDisplayW, kH};
     Font5x7 font;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 5; ++i) {
         setTheme(order[i]);
         ui.render(s, page);
         const int oy = i * (kLbl + kDisplayH);

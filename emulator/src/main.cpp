@@ -1737,9 +1737,11 @@ private:
         try {
             auto j = nlohmann::json::parse(buf);
             const std::string th = j.value("theme", "MONO");
-            gb::setTheme(th == "RED" ? gb::kThemeRed
-                         : th == "GREEN" ? gb::kThemeGreen
-                                         : gb::kThemeMono);
+            gb::setTheme(th == "RED"    ? gb::kThemeRed
+                         : th == "GREEN"  ? gb::kThemeGreen
+                         : th == "AMBER"  ? gb::kThemeAmber
+                         : th == "ARCADE" ? gb::kThemeArcade
+                                          : gb::kThemeMono);
             const std::string vs = j.value("velSource", "SLIDER");
             m_velSource = vs == "FIXED100" ? 1 : vs == "HOST" ? 2 : 0;
             m_ledBrightness = j.value("ledBrightness", 8);

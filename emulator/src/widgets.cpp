@@ -11,14 +11,31 @@ constexpr uint16_t rgb565(int r, int g, int b) {
     return uint16_t(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
 }
 constexpr Theme kThemes[kNumThemes] = {
-    // MONO: original white/gray on near-black (byte-identical values)
-    {0x0000, 0xFFFF, 0x7BEF, 0x4208},
+    // MONO: original white/gray on near-black (byte-identical values;
+    // all roles = fg)
+    {0x0000, 0xFFFF, 0x7BEF, 0x4208, {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}},
     // RED: red-lacquered instrument panel at night
     {rgb565(14, 4, 4), rgb565(255, 70, 52), rgb565(198, 92, 74),
-     rgb565(92, 26, 20)},
+     rgb565(92, 26, 20),
+     {rgb565(255, 70, 52), rgb565(255, 70, 52), rgb565(255, 70, 52),
+      rgb565(255, 70, 52)}},
     // GREEN: phosphor terminal
     {rgb565(3, 12, 5), rgb565(86, 255, 122), rgb565(96, 190, 130),
-     rgb565(22, 82, 42)},
+     rgb565(22, 82, 42),
+     {rgb565(86, 255, 122), rgb565(86, 255, 122), rgb565(86, 255, 122),
+      rgb565(86, 255, 122)}},
+    // AMBER: amber phosphor
+    {rgb565(14, 9, 2), rgb565(255, 176, 0), rgb565(184, 122, 32),
+     rgb565(90, 58, 16),
+     {rgb565(255, 176, 0), rgb565(255, 176, 0), rgb565(255, 176, 0),
+      rgb565(255, 176, 0)}},
+    // ARCADE: 16-color EGA/80s CRT — light-gray text, roles carry color
+    {rgb565(0, 0, 0), rgb565(170, 170, 170), rgb565(85, 85, 85),
+     rgb565(40, 40, 40),
+     {rgb565(255, 255, 85),  // acc1 values/toasts: yellow
+      rgb565(85, 255, 85),   // acc2 bars/levels: light green
+      rgb565(85, 255, 255),  // acc3 selection: light cyan
+      rgb565(255, 85, 85)}}, // acc4 playhead/rec: light red
 };
 ThemeId g_current = kThemeMono;
 } // namespace
@@ -28,13 +45,18 @@ uint16_t& kColBlack = g_theme.bg;
 uint16_t& kColWhite = g_theme.fg;
 uint16_t& kColGray  = g_theme.mid;
 uint16_t& kColDim   = g_theme.dim;
+uint16_t& kColAcc1  = g_theme.acc[0];
+uint16_t& kColAcc2  = g_theme.acc[1];
+uint16_t& kColAcc3  = g_theme.acc[2];
+uint16_t& kColAcc4  = g_theme.acc[3];
 
 void setTheme(ThemeId id) {
     if (id >= 0 && id < kNumThemes) { g_theme = kThemes[id]; g_current = id; }
 }
 ThemeId currentTheme() { return g_current; }
 const char* themeName(ThemeId id) {
-    static const char* kNames[kNumThemes] = {"MONO", "RED", "GREEN"};
+    static const char* kNames[kNumThemes] = {"MONO", "RED", "GREEN",
+                                             "AMBER", "ARCADE"};
     return (id >= 0 && id < kNumThemes) ? kNames[id] : "?";
 }
 
@@ -312,11 +334,11 @@ void SpectrumWidget::draw(Canvas565& c) const {
         if (v > 1.f) v = 1.f;
         const int bh = int(v * ih + 0.5f);
         const int bx = x + 1 + i * slot;
-        if (bh > 0) c.fill(bx, y + 1 + ih - bh, bw, bh, kColWhite);
+        if (bh > 0) c.fill(bx, y + 1 + ih - bh, bw, bh, kColAcc2);
         if (peaks && peaks[i] >= 0.f) {
             float p = peaks[i] > 1.f ? 1.f : peaks[i];
             const int py = y + 1 + ih - int(p * ih + 0.5f);
-            c.hline(bx, py, bw, kColGray);
+            c.hline(bx, py, bw, kColAcc4);
         }
     }
 }
@@ -328,7 +350,7 @@ void SequencerWidget::draw(Canvas565& c) const {
     c.fill(x, y, 128, rows * rowH, kColBlack);
     for (int r = 0; r < rows; ++r) {
         const bool muted = (rowMuted >> r) & 1u;
-        const uint16_t colAccent = muted ? kColDim  : kColWhite;
+        const uint16_t colAccent = muted ? kColDim  : kColAcc1;
         const uint16_t colSet    = muted ? kColDim  : kColGray;
         const uint16_t colEmpty  = kColDim;
         const int ry = y + r * rowH + (rowH - 8) / 2;
@@ -336,7 +358,7 @@ void SequencerWidget::draw(Canvas565& c) const {
             const int cx = x + s * 8;
             const uint8_t st = cells[r][s];
             const bool ph = (s == playhead);
-            if (ph) c.fill(cx, ry, 8, 8, muted ? kColDim : kColGray);
+            if (ph) c.fill(cx, ry, 8, 8, muted ? kColDim : kColAcc4);
             if (st == kStepSet || st == kStepSetAlt) {
                 c.fill(cx + 1, ry + 1, 6, 6, ph ? kColBlack : colSet);
                 if (st == kStepSetAlt) // pitch override marker
@@ -353,7 +375,7 @@ void SequencerWidget::draw(Canvas565& c) const {
     }
     // playhead underline across the grid
     if (playhead >= 0 && playhead < 16)
-        c.hline(x + playhead * 8, y + rows * rowH - 1, 8, kColWhite);
+        c.hline(x + playhead * 8, y + rows * rowH - 1, 8, kColAcc4);
 }
 
 // ── MixerWidget ─────────────────────────────────────────────────────
@@ -372,7 +394,7 @@ void MixerWidget::draw(Canvas565& c, Font5x7& font) const {
         c.frame(bx, y, 8, barH, kColDim);
         if (filled > 0)
             c.fill(bx + 1, y + barH - 1 - filled, 6, filled,
-                   mute[i] ? kColDim : kColWhite);
+                   mute[i] ? kColDim : kColAcc2);
         const int py = y + barH - 1 - int(pk * (barH - 2) + 0.5f);
         c.hline(bx, py, 8, kColGray);
         // M / S letters
@@ -390,7 +412,7 @@ void MixerWidget::draw(Canvas565& c, Font5x7& font) const {
             c.text(font, sx + 10, ly, 1, "S", kColDim);
         }
         // selected strip: bright underline
-        if (i == selected) c.hline(sx + 1, y + h - 2, 14, kColWhite);
+        if (i == selected) c.hline(sx + 1, y + h - 2, 14, kColAcc3);
     }
     // master separator
     c.vline(x + 4 * 16, y, barH, kColDim);
@@ -556,7 +578,7 @@ void ToastWidget::draw(Canvas565& c, Font5x7& font) const {
     c.frame(X + 1, Y + 1, W - 2, H - 2, kColWhite); // double border
     if (valueText) {
         const int tw = Canvas565::textWidth(valueText, 2);
-        c.text(font, X + (W - tw) / 2, Y + 3, 2, valueText, kColWhite);
+        c.text(font, X + (W - tw) / 2, Y + 3, 2, valueText, kColAcc1);
     }
     if (label) {
         const int tw = Canvas565::textWidth(label, 1);
@@ -626,7 +648,7 @@ void BatteryWidget::draw(Canvas565& c, Font5x7& font) const {
     c.fill(x + 13, y + 2, 2, 4, kColWhite); // nub
     const float lv = level < 0.f ? 0.f : (level > 1.f ? 1.f : level);
     const int fw = int(lv * 11.0f + 0.5f);
-    if (fw > 0) c.fill(x + 1, y + 1, fw, 6, lv > 0.2f ? kColWhite
+    if (fw > 0) c.fill(x + 1, y + 1, fw, 6, lv > 0.2f ? kColAcc2
                                                       : kColGray);
     if (showText) {
         char buf[8];
@@ -702,9 +724,9 @@ void StepLaneWidget::draw(Canvas565& c) const {
     for (int s = 0; s < 16; ++s) {
         const int cx = x + s * 8;
         const int bh = values[s] * 12 / 127;
-        if (bh > 0) c.fill(cx + 2, y + 14 - bh, 4, bh, kColWhite);
+        if (bh > 0) c.fill(cx + 2, y + 14 - bh, 4, bh, kColAcc2);
         c.fill(cx + 2, y + 14, 4, 1, kColDim); // baseline ticks
-        if (s == current) c.fill(cx, y, 8, 2, kColWhite); // top marker
+        if (s == current) c.fill(cx, y, 8, 2, kColAcc4); // top marker
     }
 }
 
@@ -724,10 +746,10 @@ void TunerWidget::draw(Canvas565& c, Font5x7& font) const {
     c.vline(cx, my - 2, 5, kColDim);          // center tick
     float cn = cents < -50.f ? -50.f : (cents > 50.f ? 50.f : cents);
     if (cn > -3.0f && cn < 3.0f) {
-        c.fill(cx - 3, my - 2, 6, 5, kColWhite); // in-tune block
+        c.fill(cx - 3, my - 2, 6, 5, kColAcc2); // in-tune block
     } else {
         const int nx = cx + int(cn * (iw / 2 - 2) / 50.0f);
-        c.fill(nx - 1, my - 2, 3, 5, kColWhite); // needle
+        c.fill(nx - 1, my - 2, 3, 5, kColAcc2); // needle
     }
 }
 

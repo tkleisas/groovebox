@@ -67,7 +67,7 @@ void Ui::drawParamRow(const UiParam& p, int y0, bool sel, uint16_t* fb) {
     const int bx = 132, bw = 102, by = y0 + 4, bh = 8;
     frame(fb, bx, by, bw, bh, fg);
     const int fw = (bw - 2) * p.value / 127;
-    if (fw > 0) fill(fb, bx + 1, by + 1, fw, bh - 2, fg);
+    if (fw > 0) fill(fb, bx + 1, by + 1, fw, bh - 2, kColAcc2); // bar fill
 }
 
 void Ui::drawHeader(const UiState& s, uint16_t* fb) {

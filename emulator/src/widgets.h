@@ -18,15 +18,17 @@
 namespace gb {
 
 // ── Theme ───────────────────────────────────────────────────────────
-// The whole device-screen palette is four slots: bg (background), fg
-// (primary: text, set cells, waveforms), mid (secondary: frames,
-// meters, dimmer elements), dim (faintest: empty dots, guides).
-// Selection/inverse video = fg-on-fg-fill via these slots, so every
-// theme adapts automatically. MONO is byte-identical to the original
-// constants.
-struct Theme { uint16_t bg, fg, mid, dim; };
+// The whole device-screen palette is four base slots (bg = background,
+// fg = primary text/set cells, mid = secondary, dim = faintest) plus
+// four ACCENT ROLES for the things that pop:
+//   acc[0] values/toasts      acc[1] bars/levels/meters
+//   acc[2] selection accents  acc[3] playhead / record markers
+// MONO/RED/GREEN/AMBER map every role to fg (byte-identical look to the
+// pre-role palette). ARCADE uses the roles for real color separation.
+struct Theme { uint16_t bg, fg, mid, dim, acc[4]; };
 
-enum ThemeId { kThemeMono = 0, kThemeRed, kThemeGreen, kNumThemes };
+enum ThemeId { kThemeMono = 0, kThemeRed, kThemeGreen, kThemeAmber,
+               kThemeArcade, kNumThemes };
 
 extern Theme g_theme;             // live palette (set via setTheme)
 // Live aliases — existing widget/ui code reads these per draw call, so
@@ -35,6 +37,10 @@ extern uint16_t& kColBlack; // = g_theme.bg
 extern uint16_t& kColWhite; // = g_theme.fg
 extern uint16_t& kColGray;  // = g_theme.mid
 extern uint16_t& kColDim;   // = g_theme.dim
+extern uint16_t& kColAcc1;  // = g_theme.acc[0] (values/toasts)
+extern uint16_t& kColAcc2;  // = g_theme.acc[1] (bars/levels)
+extern uint16_t& kColAcc3;  // = g_theme.acc[2] (selection)
+extern uint16_t& kColAcc4;  // = g_theme.acc[3] (playhead/rec)
 
 void setTheme(ThemeId id);
 ThemeId currentTheme();
