@@ -146,9 +146,16 @@ void loadDefaultDrums(yawn::instruments::DrumRack* rack, double sr) {
 
 class App : public gb::HalHandler {
 public:
+    void setPanelProfile(gb::PanelProfile p) {
+        m_nsr2 = (p == gb::kPanelNSR2);
+        m_winSize = m_nsr2 ? 8 : 16;
+        if (m_nsr2) m_velSource = 1; // NSR-2 default: fixed 100
+    }
+
     // testMode: 0 = interactive, 1 = --smoke, 2 = --seqtest
     int run(int testMode) {
         m_testMode = testMode;
+        m_hal.setPanelProfile(m_nsr2 ? gb::kPanelNSR2 : gb::kPanelNSR1);
         std::printf("groovebox_sim — yawn engine emulator%s\n",
                     testMode == 1 ? " (smoke test)"
                     : testMode == 2 ? " (sequencer test)"
@@ -209,6 +216,8 @@ public:
         m_state.chooserCount = int(m_fxItems.size());
 
         // settings + browser (persisted settings load interactive-only)
+        m_state.nsr2 = m_nsr2;
+        m_state.textBuf = m_textBuf;
         if (testMode == 0) loadSettings();
         syncSettingsUi();
         refreshBrowser();
@@ -314,6 +323,7 @@ public:
         if (m_testMode == 5) return probeVerdict();
         if (m_testMode == 6) return paramtestVerdict();
         if (m_testMode == 7) return sampletestVerdict();
+        if (m_testMode == 8) return nsr2testVerdict();
         return 0;
     }
 
@@ -360,6 +370,20 @@ public:
         using namespace gb;
         // boot splash: any key skips
         if (pressed && m_splash) { m_splash = false; return; }
+        // NSR-2: translate panel key indices to NSR-1 logical keys;
+        // grid keys (0..31) get their own handler below the modal gate.
+        // NOTE: translation of MODE (35) lands on 31 — the grid branch
+        // must use the RAW index, never the translated one.
+        const int rawIndex = index;
+        if (m_nsr2 && index > 31 && index != kN2Space) {
+            static const int8_t kMap[45 - 32] = {
+                kKeyPlay, kKeyStop, kKeyRec, kKeyMode, kKeyPrev, kKeyNext,
+                kKeySoft1, kKeySoft2, kKeySoft3, kKeySoft4,
+                kKeyShiftL, kKeyShiftR, -1};
+            const int8_t mapped = kMap[index - 32];
+            if (mapped < 0) return;
+            index = mapped;
+        }
         // confirm dialog is modal: S1 = OK, S2 = CANCEL, rest swallowed
         if (m_confirmAction != 0) {
             if (!pressed) return;
@@ -377,6 +401,15 @@ public:
             m_lenEdit = false;
             std::printf("[seq] length edit done (LEN %d)\n",
                         m_pattern.length);
+            return;
+        }
+        // NSR-2 grid keys (0..31, RAW index) — step/iso-play/text modes
+        if (m_nsr2 && rawIndex <= 31) {
+            onGridKey(rawIndex, pressed);
+            return;
+        }
+        if (m_nsr2 && index == kN2Space) { // wide bar
+            if (pressed && m_state.mode == 2) textType(' ');
             return;
         }
         // Piano keys (white 0..15, black 16..26)
@@ -526,7 +559,7 @@ public:
             break;
         case 6:   // SET: enc1 = row, enc2 = adjust
             if (index == 0) {
-                m_state.settingsSel = (m_state.settingsSel + delta + 3) % 3;
+                m_state.settingsSel = (m_state.settingsSel + delta + 4) % 4;
             } else if (index == 1) {
                 settingsAdjust(delta);
             }
@@ -724,7 +757,7 @@ private:
     void adjustLength(int delta) {
         m_pattern.length = std::max(1, std::min(gb::Pattern::kMaxSteps,
                                                 m_pattern.length + delta));
-        const int maxWin = (m_pattern.length - 1) / 16 * 16;
+        const int maxWin = (m_pattern.length - 1) / m_winSize * m_winSize;
         if (m_window > maxWin) m_window = maxWin;
         char vb[8];
         std::snprintf(vb, sizeof(vb), "%03d", m_pattern.length);
@@ -732,19 +765,20 @@ private:
         std::printf("[seq] LEN = %d\n", m_pattern.length);
     }
 
-    // Window paging (SEQ page, shift+</>): manual ±16-step moves;
-    // landing on the playhead's page re-engages follow mode.
+    // Window paging (SEQ page, shift+</>): manual moves by one window
+    // (16 steps on NSR-1, 8 on NSR-2); landing on the playhead's page
+    // re-engages follow mode.
     void pageWindow(int dir) {
-        const int pages = m_pattern.pageCount();
-        int pg = m_window / 16 + dir;
+        const int pages = (m_pattern.length + m_winSize - 1) / m_winSize;
+        int pg = m_window / m_winSize + dir;
         pg = std::max(0, std::min(pages - 1, pg));
-        m_window = pg * 16;
-        m_follow = (m_playhead >= 0 && m_playhead / 16 == pg);
+        m_window = pg * m_winSize;
+        m_follow = (m_playhead >= 0 && m_playhead / m_winSize == pg);
         char vb[8];
         std::snprintf(vb, sizeof(vb), "%d/%d", pg + 1, pages);
         toast("PAGE", vb);
         std::printf("[seq] window -> steps %d-%d (page %d/%d)%s\n",
-                    m_window, m_window + 15, pg + 1, pages,
+                    m_window, m_window + m_winSize - 1, pg + 1, pages,
                     m_follow ? " [follow]" : "");
     }
 
@@ -796,9 +830,125 @@ private:
     }
 
     void toggleMode() {
-        m_state.mode ^= 1;
+        if (m_nsr2) { // NSR-2: PLAY -> STEP -> TEXT -> PLAY
+            m_state.mode = (m_state.mode + 1) % 3;
+        } else {
+            m_state.mode ^= 1;
+        }
+        static const char* kModes[3] = {"PLAY", "SEQ", "TEXT"};
         std::printf("[panel] MODE -> %s (keyboard row)\n",
-                    m_state.mode == 0 ? "PLAY" : "SEQ");
+                    kModes[m_state.mode]);
+    }
+
+    // ── NSR-2 grid (0..31) ──────────────────────────────────────────
+    void onGridKey(int index, bool pressed) {
+        const int row = index >> 3, col = index & 7;
+        if (shiftHeld()) {
+            // shift + grid 1-4 = track select, 5-8 = mute (NSR-1 rule)
+            if (pressed && row == 0) {
+                if (col <= 3) selectTrack(col);
+                else          muteTrack(col - 4);
+            }
+            return;
+        }
+        switch (m_state.mode) {
+        case 1:  gridStepKey(index, pressed, row, col); break;
+        case 2:  if (pressed) textType(textKeyChar(index)); break;
+        default: gridPlayKey(index, pressed, row, col); break;
+        }
+    }
+
+    // Step mode: grid = 4 tracks x 8-step window into the pattern.
+    void gridStepKey(int index, bool pressed, int row, int col) {
+        (void)index;
+        const int step = m_window + col;
+        if (step >= m_pattern.length) return;
+        // hold-to-edit gesture, same as NSR-1 white keys
+        if (pressed) {
+            if (m_heldStep == col && m_heldRow == row) return; // storm
+            m_heldStep = col;
+            m_heldRow = row;
+            m_heldEdited = false;
+        } else {
+            if (m_heldStep == col && m_heldRow == row) {
+                if (!m_heldEdited) toggleStep(row, step);
+                m_heldStep = -1;
+                m_heldRow = -1;
+            }
+        }
+    }
+
+    // Play mode: scale-locked isomorphic grid.
+    // note = base C3 + col + 4 * rowFromBottom (row up = +4 semitones)
+    static bool inScale(int pc, int scale) {
+        // scale: 0=major 1=minor 2=chromatic (C-based pitch-class masks)
+        static const uint16_t kMasks[2] = {0b101011010101,
+                                           0b101101010101};
+        return scale == 2 || ((kMasks[scale] >> (pc % 12)) & 1u);
+    }
+    static int snapToScale(int note, int scale) {
+        if (inScale(note % 12, scale)) return note;
+        for (int d = 1; d <= 6; ++d) {
+            if (inScale((note + d) % 12, scale)) return note + d; // up first
+            if (inScale((note - d) % 12, scale)) return note - d;
+        }
+        return note;
+    }
+
+    void gridPlayKey(int index, bool pressed, int row, int col) {
+        const int rowFromBottom = 3 - row;
+        const int raw = 48 + col + 4 * rowFromBottom; // base C3
+        const int note = snapToScale(raw, m_scaleLock);
+        if (pressed) m_lastGridNote = note;
+        if (pressed && note != raw) {
+            char nb[8];
+            std::printf("[panel] scale-lock: raw %d -> %s\n", raw,
+                        noteName(note, nb, sizeof(nb)));
+        }
+        playNote(m_state.track, note, pressed, index);
+    }
+
+    // note on/off with per-key tracking (chords + LEDs)
+    void playNote(int track, int note, bool pressed, int ledKey) {
+        sendNote(track, note, pressed, pressed ? velocity7() : 0);
+        if (ledKey >= 0) m_gridNoteHeld[ledKey] = pressed;
+        char nb[8];
+        std::printf("[engine] NOTE %-3s T%d %s(%d) vel%d\n",
+                    pressed ? "ON " : "OFF", track + 1,
+                    noteName(note, nb, sizeof(nb)), note,
+                    pressed ? velocity7() : 0);
+        std::fflush(stdout);
+    }
+
+    // ── NSR-2 text-entry mode ───────────────────────────────────────
+    // Grid rows: QWERTYUI / ASDFGHJK / ZXCVBNM. / punct+enter+bksp
+    static char textKeyChar(int index) {
+        static const char* const kRows[4] = {
+            "QWERTYUI", "ASDFGHJK", "ZXCVBNM.", ",/-?!\x27"  ""};
+        if (index < 23) return kRows[index >> 3][index & 7];
+        switch (index) {
+        case 29: return '\b';
+        case 30: return 0;    // (unused slot)
+        case 31: return '\n'; // enter
+        default: return kRows[3][index - 24];
+        }
+    }
+
+    void textType(char c) {
+        if (c == '\n') { // enter: done -> back to step mode
+            m_state.mode = 1;
+            std::printf("[text] entry done: \"%s\"\n", m_textBuf);
+            return;
+        }
+        if (c == '\b') {
+            if (m_textLen > 0) m_textBuf[--m_textLen] = 0;
+        } else if (c && m_textLen < int(sizeof(m_textBuf)) - 1) {
+            m_textBuf[m_textLen++] = c;
+            m_textBuf[m_textLen] = 0;
+        }
+        m_state.textBuf = m_textBuf;
+        m_state.textCursor = m_textLen;
+        std::printf("[text] \"%s\"\n", m_textBuf);
     }
 
     // ── Transport ───────────────────────────────────────────────────
@@ -953,14 +1103,14 @@ private:
 
     // ── UI sync (pattern → widgets, pattern+playhead → LEDs) ────────
     void syncPatternToUi() {
-        // Follow mode: the 16-step window tracks the playhead's page.
+        // Follow mode: the window tracks the playhead's page.
         if (m_follow && m_playhead >= 0)
-            m_window = (m_playhead / 16) * 16;
+            m_window = (m_playhead / m_winSize) * m_winSize;
         const int sel = m_state.track;
         const int len = m_pattern.length;
         // playhead column within the window (-1 if on another page)
         const int ph = (m_playhead >= m_window &&
-                        m_playhead < m_window + 16)
+                        m_playhead < m_window + m_winSize)
                            ? m_playhead - m_window : -1;
         m_state.seq.playhead = ph;
         m_state.seq.rowMuted = 0;
@@ -970,6 +1120,11 @@ private:
         for (int t = 0; t < 4; ++t) {
             if (m_muted[t]) m_state.seq.rowMuted |= uint8_t(1u << t);
             for (int s = 0; s < 16; ++s) {
+                // NSR-2's 8-step window occupies columns 0..7 only
+                if (s >= m_winSize) {
+                    m_state.seq.cells[t][s] = gb::kStepEmpty;
+                    continue;
+                }
                 const int idx = m_window + s;
                 if (idx >= len) { // past pattern end: render empty
                     m_state.seq.cells[t][s] = gb::kStepEmpty;
@@ -988,18 +1143,43 @@ private:
         for (int s = 0; s < 16; ++s) {
             const int idx = m_window + s;
             const auto& st = m_pattern.steps[sel][idx];
-            m_state.lane.values[s] = (idx < len && st.on) ? st.vel : 0;
+            m_state.lane.values[s] =
+                (s < m_winSize && idx < len && st.on) ? st.vel : 0;
         }
         m_state.lane.current = ph;
         for (int i = 0; i < 4; ++i) m_state.mixer.mute[i] = m_muted[i];
-        // LEDs: selected track's window steps, playhead inverts. Rev-A
-        // LEDs are on/off only (no brightness), so accents read the
-        // same as set steps.
-        for (int i = 0; i < 16; ++i) {
-            const int idx = m_window + i;
-            const bool on = idx < len && m_pattern.steps[sel][idx].on;
-            const bool v = on != (i == ph);
-            m_state.leds[i] = v;
+        syncLeds(ph);
+    }
+
+    // LEDs: NSR-1 lights the 16 white-key LEDs (selected track's window
+    // steps, playhead inverts). NSR-2 lights the 32 grid LEDs: step
+    // mode = all 4 tracks' window steps (grid mirrors the SEQ page),
+    // play mode = held notes, text mode = enter/backspace markers.
+    void syncLeds(int ph) {
+        if (!m_nsr2) {
+            const int len = m_pattern.length;
+            const int sel = m_state.track;
+            for (int i = 0; i < 16; ++i) {
+                const int idx = m_window + i;
+                const bool on = idx < len && m_pattern.steps[sel][idx].on;
+                const bool v = on != (i == ph);
+                m_state.leds[i] = v;
+                m_hal.setLed(i, v);
+            }
+            return;
+        }
+        for (int i = 0; i < gb::kN2NumLeds; ++i) {
+            bool v = false;
+            if (m_state.mode == 1) {
+                const int idx = m_window + (i & 7);
+                v = idx < m_pattern.length && m_pattern.steps[i >> 3][idx].on;
+                if ((i & 7) == ph) v = !v; // playhead inverts
+            } else if (m_state.mode == 0) {
+                v = m_gridNoteHeld[i];
+            } else {
+                v = (i == 29 || i == 31); // bksp + enter markers
+            }
+            if (i < 16) m_state.leds[i] = v;
             m_hal.setLed(i, v);
         }
     }
@@ -1510,9 +1690,18 @@ private:
             std::printf("[set] LED brightness -> %d (stub)\n",
                         m_ledBrightness);
             break;
+        case 3: // SCALE lock (play mode)
+            m_scaleLock = (m_scaleLock + (dir > 0 ? 1 : 2)) % 3;
+            std::printf("[set] scale -> %s\n", scaleName());
+            break;
         }
         syncSettingsUi();
         saveSettings(); // save-on-change
+    }
+
+    const char* scaleName() const {
+        return m_scaleLock == 0 ? "MAJOR" : m_scaleLock == 1 ? "MINOR"
+                                                             : "CHROM";
     }
 
     void syncSettingsUi() {
@@ -1521,6 +1710,7 @@ private:
         std::snprintf(m_ledValBuf, sizeof(m_ledValBuf), "%d",
                       m_ledBrightness);
         m_state.settingsVal[2] = m_ledValBuf;
+        m_state.settingsVal[3] = scaleName();
     }
 
     void saveSettings() {
@@ -1528,6 +1718,7 @@ private:
         j["theme"] = themeNameGb();
         j["velSource"] = velSourceName();
         j["ledBrightness"] = m_ledBrightness;
+        j["scale"] = scaleName();
         if (FILE* f = std::fopen("settings.json", "wb")) {
             const std::string s = j.dump(2);
             std::fwrite(s.data(), 1, s.size(), f);
@@ -1552,6 +1743,8 @@ private:
             const std::string vs = j.value("velSource", "SLIDER");
             m_velSource = vs == "FIXED100" ? 1 : vs == "HOST" ? 2 : 0;
             m_ledBrightness = j.value("ledBrightness", 8);
+            const std::string sc = j.value("scale", "CHROM");
+            m_scaleLock = sc == "MAJOR" ? 0 : sc == "MINOR" ? 1 : 2;
             std::printf("[set] loaded settings.json (theme=%s vel=%s)\n",
                         th.c_str(), vs.c_str());
         } catch (...) {
@@ -1666,7 +1859,8 @@ private:
         else if (m_testMode == 4) longtestStep(t, once);
         else if (m_testMode == 5) probeStep(t, once);
         else if (m_testMode == 6) paramtestStep(t, once);
-        else                      sampletestStep(t, once);
+        else if (m_testMode == 7) sampletestStep(t, once);
+        else                      nsr2testStep(t, once);
     }
 
     // --smoke: boot + notes on both engine tracks + frame per page.
@@ -1968,25 +2162,39 @@ private:
             e.wheel.integer_y = d; e.wheel.y = float(d);
             SDL_PushEvent(&e);
         };
-        // panel coords: mm*4. White key 1 center ≈ (46mm, 134mm).
+        // panel coords: mm*4. NSR-1: white key 1 (46,134)mm.
+        // NSR-2: grid key 0 center (41,138)mm.
+        const float keyX = m_nsr2 ? 41.0f : 46.0f;
+        const float keyY = m_nsr2 ? 138.0f : 134.0f;
         if (t >= 0.5 && once(0)) {
-            std::printf("[probe] click white key 1 (46,134)mm\n");
-            pushButton(46.0f * 4, 134.0f * 4, true);
+            std::printf("[probe] click key @ (%.0f,%.0f)mm\n", keyX, keyY);
+            pushButton(keyX * 4, keyY * 4, true);
         }
-        if (t >= 0.8 && once(1)) pushButton(46.0f * 4, 134.0f * 4, false);
-        // RES pot center (158mm, 32mm); drag up 60 px = +0.5
+        if (t >= 0.8 && once(1)) pushButton(keyX * 4, keyY * 4, false);
+        // NSR-1: RES pot drag. NSR-2: crossfader drag (analog ch 6).
         if (t >= 1.1 && once(2)) {
-            std::printf("[probe] drag RES pot up 60px\n");
-            pushButton(158.0f * 4, 32.0f * 4, true);
-            for (int i = 1; i <= 6; ++i)
-                pushMotion(158.0f * 4, (32.0f * 4) - i * 10.0f);
-            pushButton(158.0f * 4, 32.0f * 4 - 60.0f, false);
+            if (m_nsr2) {
+                // click near the fader bottom, drag up 60px: 0.04 -> 0.33
+                std::printf("[probe] drag crossfader up 60px\n");
+                pushButton(162.0f * 4, 180.0f * 4, true);
+                for (int i = 1; i <= 6; ++i)
+                    pushMotion(162.0f * 4, (180.0f * 4) - i * 10.0f);
+                pushButton(162.0f * 4, 180.0f * 4 - 60.0f, false);
+            } else {
+                std::printf("[probe] drag RES pot up 60px\n");
+                pushButton(158.0f * 4, 32.0f * 4, true);
+                for (int i = 1; i <= 6; ++i)
+                    pushMotion(158.0f * 4, (32.0f * 4) - i * 10.0f);
+                pushButton(158.0f * 4, 32.0f * 4 - 60.0f, false);
+            }
         }
-        // encoder 3 center (70mm, 88mm); wheel up twice
+        // encoder 3 center: NSR-1 (70,88)mm, NSR-2 (97,103)mm
         if (t >= 1.5 && once(3)) {
+            const float ex = m_nsr2 ? 97.0f : 70.0f;
+            const float ey = m_nsr2 ? 103.0f : 88.0f;
             std::printf("[probe] wheel over ENC3\n");
-            pushWheel(70.0f * 4, 88.0f * 4, +1);
-            pushWheel(70.0f * 4, 88.0f * 4, +1);
+            pushWheel(ex * 4, ey * 4, +1);
+            pushWheel(ex * 4, ey * 4, +1);
         }
         if (t >= 1.8 && once(4)) {
             std::printf("[probe] done — asserting\n");
@@ -2001,8 +2209,13 @@ private:
                         ok ? "PASS" : "FAIL");
             ok ? ++pass : ++fail;
         };
-        check(m_probeNotes == 1, "mouse click on white key 1 -> note event");
-        check(m_state.params[1].value != 41, "RES pot drag -> analog delta");
+        check(m_probeNotes == 1, "mouse click on key -> note event");
+        if (m_nsr2)
+            check(std::fabs(m_slider - 0.8f) > 0.05f,
+                  "crossfader drag -> analog delta (ch 6)");
+        else
+            check(m_state.params[1].value != 41,
+                  "RES pot drag -> analog delta");
         // ENC3 on the OSC page = Osc2 Wave (norm default 0.25)
         check(std::fabs(getNormParam(m_encParam[2]) - 0.25f) > 0.05f,
               "wheel over ENC3 -> encoder delta");
@@ -2283,6 +2496,94 @@ private:
         return fail == 0 ? 0 : 1;
     }
 
+    // --nsr2test: NSR-2 grid semantics — step entry, isomorphic play
+    // with scale lock, MODE cycle, text entry, 32-LED path.
+    template <typename Once>
+    void nsr2testStep(double t, Once& once) {
+        if (t >= 0.3 && once(0)) {
+            std::printf("[nsr2test] MODE -> STEP; grid step entry\n");
+            m_n2Ok[0] = m_nsr2;
+            onKey(gb::kN2Mode, true); onKey(gb::kN2Mode, false);
+            m_n2Ok[0] = m_n2Ok[0] && m_state.mode == 1;
+            // row 0 (T1) steps 0 and 2; row 1 (T2) step 1
+            onKey(0, true); onKey(0, false);
+            onKey(2, true); onKey(2, false);
+            onKey(9, true); onKey(9, false);
+            // shift+> to page 2 (SEQ page needed for window paging),
+            // then row 0 col 0 = step 8
+            setPage(1);
+            onKey(gb::kN2ShiftL, true);
+            onKey(gb::kN2Next, true); onKey(gb::kN2Next, false);
+            onKey(gb::kN2ShiftL, false);
+            onKey(0, true); onKey(0, false);
+            m_n2Ok[1] = m_pattern.steps[0][0].on &&
+                        m_pattern.steps[0][2].on &&
+                        m_pattern.steps[1][1].on &&
+                        m_pattern.steps[0][8].on && m_window == 8;
+        }
+        if (t >= 0.8 && once(1)) {
+            std::printf("[nsr2test] MODE -> PLAY; isomorphic notes\n");
+            // NSR-2 cycle SEQ -> TEXT -> PLAY: two presses
+            onKey(gb::kN2Mode, true); onKey(gb::kN2Mode, false);
+            onKey(gb::kN2Mode, true); onKey(gb::kN2Mode, false);
+            // grid key 16 = (row-from-bottom 1, col 0) -> E3 = 52
+            onKey(16, true); onKey(16, false);
+            m_n2Ok[2] = m_lastGridNote == 52;
+            std::printf("[nsr2test] grid key 16 -> note %d (want 52/E3)\n",
+                        m_lastGridNote);
+        }
+        if (t >= 1.1 && once(2)) {
+            // scale lock MAJOR via SETTINGS encoder path (still PLAY)
+            setPage(6);
+            m_state.settingsSel = 3;
+            onEncoderDelta(1, +1); // CHROM -> MAJOR
+            setPage(1);
+            // grid key 25 (bottom row, col 1): raw C#3 -> snap to D3
+            onKey(25, true); onKey(25, false);
+            m_n2Ok[3] = m_lastGridNote == 50;
+            std::printf("[nsr2test] grid key 25 major-lock -> %d (want 50/D3)\n",
+                        m_lastGridNote);
+        }
+        if (t >= 1.5 && once(3)) {
+            std::printf("[nsr2test] MODE -> TEXT; type HI\n");
+            // PLAY -> SEQ -> TEXT: two presses
+            onKey(gb::kN2Mode, true); onKey(gb::kN2Mode, false);
+            onKey(gb::kN2Mode, true); onKey(gb::kN2Mode, false);
+            onKey(13, true); onKey(13, false); // H (row 1, col 5)
+            onKey(7, true);  onKey(7, false);  // I (row 0, col 7)
+            m_n2Ok[4] = std::strcmp(m_textBuf, "HI") == 0 &&
+                        m_state.mode == 2;
+            dumpFrame("nsr2test_text.rgb565");
+            onKey(31, true); onKey(31, false); // ENTER -> step mode
+            m_n2Ok[4] = m_n2Ok[4] && m_state.mode == 1;
+        }
+        if (t >= 1.9 && once(5)) {
+            dumpFrame("nsr2test_seq.rgb565");
+            m_n2Ok[5] = m_hal.ledMaxIndex() >= 31;
+            std::printf("[nsr2test] led max index = %d\n",
+                        m_hal.ledMaxIndex());
+            std::printf("[nsr2test] done — asserting\n");
+            m_running = false;
+        }
+    }
+
+    int nsr2testVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[nsr2test] ASSERT %-46s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_n2Ok[0], "MODE cycles to step mode on NSR-2");
+        check(m_n2Ok[1], "grid step entry across 2 tracks + paging");
+        check(m_n2Ok[2], "grid key 16 plays E3 (isomorphic)");
+        check(m_n2Ok[3], "scale-lock major snaps C#3 -> D3");
+        check(m_n2Ok[4], "text mode types HI, ENTER exits to step");
+        check(m_n2Ok[5], "32-LED path exercised (index >= 31)");
+        std::printf("[nsr2test] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
     int seqtestVerdict() const {
         int pass = 0, fail = 0;
         auto check = [&](bool ok, const char* what) {
@@ -2377,7 +2678,16 @@ private:
 
     // hold-step edit gesture (SEQ mode)
     int m_heldStep = -1;
+    int m_heldRow = -1;      // NSR-2 grid row of the held key
     bool m_heldEdited = false;
+
+    // NSR-2 panel profile state
+    bool m_nsr2 = false;
+    int m_winSize = 16;      // step window: 16 NSR-1, 8 NSR-2
+    bool m_gridNoteHeld[32] = {};
+    char m_textBuf[32] = {};
+    int m_textLen = 0;
+    int m_scaleLock = 2;     // 0=major 1=minor 2=chromatic
 
     // long patterns: 16-step window + follow + length edit
     int m_window = 0;          // first visible step (multiple of 16)
@@ -2410,13 +2720,16 @@ private:
     int m_probeNotes = 0;
     bool m_ptOk[11] = {}; // paramtest assertions
     bool m_stOk[8] = {};  // sampletest assertions
+    bool m_n2Ok[6] = {};  // nsr2test assertions
+    int m_lastGridNote = -1;
 };
 
 namespace {
 
 // --paneldump: render one panel frame (with a real device screen page
 // and some demo control activity) to a PNG, no window/engine needed.
-bool writePanelDumpPng(const char* path) {
+// profile: kPanelNSR1 → NSR-1 faceplate, kPanelNSR2 → NSR-2.
+bool writePanelDumpPng(const char* path, gb::PanelProfile profile) {
     // device screen: the default SYNTH page
     gb::Ui ui;
     gb::UiState state; // defaults: SYNTH page, params, T1 120
@@ -2431,14 +2744,29 @@ bool writePanelDumpPng(const char* path) {
     for (int i = 0; i < 6; ++i) ps.pots[i] = pots[i];
     ps.slider = 0.8f;
     ps.joyX = 0.3f; ps.joyY = 0.2f;
-    for (int i = 0; i < 16; i += 4) ps.leds[i] = true;
-    ps.activeType = gb::PanelView::kHitPot;   // highlight CUT knob
-    ps.activeIndex = 0;
+    for (int i = 0; i < gb::kMaxLeds; i += 4) ps.leds[i] = true;
 
-    std::vector<uint16_t> fb(size_t(gb::PanelView::kW) * gb::PanelView::kH);
-    gb::Canvas565 c{fb.data(), gb::PanelView::kW, gb::PanelView::kH};
+    const int pw = profile == gb::kPanelNSR2 ? gb::PanelViewNSR2::kW
+                                             : gb::PanelView::kW;
+    const int ph = profile == gb::kPanelNSR2 ? gb::PanelViewNSR2::kH
+                                             : gb::PanelView::kH;
+    if (profile == gb::kPanelNSR2) {          // highlight grid key 0
+        ps.activeType = gb::PanelView::kHitKey;
+        ps.activeIndex = 0;
+        ps.keyDown[gb::kN2Play] = true;
+        ps.keyDown[gb::kN2Rec] = true;
+    } else {
+        ps.activeType = gb::PanelView::kHitPot; // highlight CUT knob
+        ps.activeIndex = 0;
+    }
+
+    std::vector<uint16_t> fb(size_t(pw) * ph);
+    gb::Canvas565 c{fb.data(), pw, ph};
     gb::Font5x7 font;
-    gb::PanelView::render(c, font, ps, screen);
+    if (profile == gb::kPanelNSR2)
+        gb::PanelViewNSR2::render(c, font, ps, screen);
+    else
+        gb::PanelView::render(c, font, ps, screen);
 
     std::vector<unsigned char> rgb(fb.size() * 3);
     for (size_t i = 0; i < fb.size(); ++i) {
@@ -2447,10 +2775,8 @@ bool writePanelDumpPng(const char* path) {
         rgb[i * 3 + 1] = uint8_t(((p >> 5) & 0x3F) * 255 / 63);
         rgb[i * 3 + 2] = uint8_t((p & 0x1F) * 255 / 31);
     }
-    const int ok = stbi_write_png(path, gb::PanelView::kW, gb::PanelView::kH,
-                                  3, rgb.data(), gb::PanelView::kW * 3);
-    if (ok) std::printf("[paneldump] wrote %s (%dx%d)\n", path,
-                        gb::PanelView::kW, gb::PanelView::kH);
+    const int ok = stbi_write_png(path, pw, ph, 3, rgb.data(), pw * 3);
+    if (ok) std::printf("[paneldump] wrote %s (%dx%d)\n", path, pw, ph);
     else    std::fprintf(stderr, "[paneldump] FAILED to write %s\n", path);
     return ok != 0;
 }
@@ -2505,7 +2831,18 @@ int main(int argc, char** argv) {
         return EXCEPTION_EXECUTE_HANDLER;
     });
 #endif
+    gb::PanelProfile panel = gb::kPanelNSR1;
     for (int i = 1; i < argc; ++i) {
+        if (std::strncmp(argv[i], "--panel=", 8) == 0) {
+            panel = std::strcmp(argv[i] + 8, "nsr2") == 0 ? gb::kPanelNSR2
+                                                          : gb::kPanelNSR1;
+        }
+    }
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--version") == 0) {
+            std::printf("groovebox_sim %s\n", GB_VERSION_STRING);
+            return 0;
+        }
         if (std::strcmp(argv[i], "--fontchart") == 0) {
             const char* out = (i + 1 < argc && argv[i + 1][0] != '-')
                                   ? argv[i + 1] : "fontchart.png";
@@ -2519,7 +2856,7 @@ int main(int argc, char** argv) {
         if (std::strcmp(argv[i], "--paneldump") == 0) {
             const char* out = (i + 1 < argc && argv[i + 1][0] != '-')
                                   ? argv[i + 1] : "panel.png";
-            return writePanelDumpPng(out) ? 0 : 1;
+            return writePanelDumpPng(out, panel) ? 0 : 1;
         }
         if (std::strcmp(argv[i], "--splashdump") == 0) {
             const char* out = (i + 1 < argc && argv[i + 1][0] != '-')
@@ -2533,13 +2870,17 @@ int main(int argc, char** argv) {
         }
     }
     int testMode = 0;
-    if (argc > 1 && std::strcmp(argv[1], "--smoke") == 0)    testMode = 1;
-    if (argc > 1 && std::strcmp(argv[1], "--seqtest") == 0)  testMode = 2;
-    if (argc > 1 && std::strcmp(argv[1], "--uitest") == 0)   testMode = 3;
-    if (argc > 1 && std::strcmp(argv[1], "--longtest") == 0) testMode = 4;
-    if (argc > 1 && std::strcmp(argv[1], "--panelprobe") == 0) testMode = 5;
-    if (argc > 1 && std::strcmp(argv[1], "--paramtest") == 0) testMode = 6;
-    if (argc > 1 && std::strcmp(argv[1], "--sampletest") == 0) testMode = 7;
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--smoke") == 0)      testMode = 1;
+        if (std::strcmp(argv[i], "--seqtest") == 0)    testMode = 2;
+        if (std::strcmp(argv[i], "--uitest") == 0)     testMode = 3;
+        if (std::strcmp(argv[i], "--longtest") == 0)   testMode = 4;
+        if (std::strcmp(argv[i], "--panelprobe") == 0) testMode = 5;
+        if (std::strcmp(argv[i], "--paramtest") == 0)  testMode = 6;
+        if (std::strcmp(argv[i], "--sampletest") == 0) testMode = 7;
+        if (std::strcmp(argv[i], "--nsr2test") == 0)   testMode = 8;
+    }
     App app;
+    app.setPanelProfile(panel);
     return app.run(testMode);
 }

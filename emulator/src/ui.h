@@ -93,8 +93,13 @@ struct UiState {
     FileBrowserWidget browser;
 
     // SETTINGS page (page 6)
-    int settingsSel = 0;               // 0..2
-    const char* settingsVal[3] = {};   // value strings per row
+    int settingsSel = 0;               // 0..3
+    const char* settingsVal[4] = {};   // value strings per row
+
+    // NSR-2 additions
+    bool nsr2 = false;
+    const char* textBuf = nullptr;     // text-entry mode buffer
+    int textCursor = 0;
 
     // confirm dialog overlay
     bool dialogActive = false;

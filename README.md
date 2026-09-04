@@ -120,12 +120,18 @@ groovebox_sim --longtest    1–256 step pattern assertions (9/9)
 groovebox_sim --paramtest   pot pickup / encoder ownership / FX (11/11)
 groovebox_sim --sampletest  mic capture → trim → assign → browser (8/8)
 groovebox_sim --panelprobe  synthetic mouse → HAL events (3/3)
+groovebox_sim --panel=nsr2 --nsr2test    NSR-2 grid semantics (6/6)
+groovebox_sim --panel=nsr2 --panelprobe  synthetic mouse on NSR-2 (3/3)
 groovebox_sim --widgets     widget showcase → docs/widgets.png
 groovebox_sim --fontchart   font chart → docs/fontchart.png
 groovebox_sim --themes      3-theme chart → docs/themes.png
 groovebox_sim --paneldump   panel render → docs/panel_sim.png
 groovebox_sim --splashdump  boot splash → docs/bootsplash.png
 ```
+
+`--panel=<nsr1|nsr2>` selects the panel profile (faceplate, key
+semantics, LED count) for interactive, test, and dump modes
+(`--panel=nsr2 --paneldump panel.png` renders the NSR-2 faceplate).
 
 ## Repository layout
 

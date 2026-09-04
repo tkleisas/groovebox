@@ -107,6 +107,43 @@ Rules:
   the feature bits is the discovery mechanism.
 - **Unknown `src` codes fall back to the slider**, never to a dead velocity.
 
+## NSR-2 panel variant
+
+NSR-2 is the compact portrait panel (180x210 mm, 4x8 Choc grid — see
+`docs/nsr2-design.md`). Same protocol v1 mechanics; different key map,
+LED count, and defaults.
+
+### Key map (45 keys, channel 1, note = 36 + index)
+
+| Index | Note | Key |
+|---|---|---|
+| 0–31 | 36–67 | grid keys, row-major (top-left = 0) |
+| 32, 33, 34 | 68, 69, 70 | PLAY, STOP, REC |
+| 35 | 71 | MODE |
+| 36, 37 | 72, 73 | < , > |
+| 38–41 | 74–77 | soft keys S1–S4 |
+| 42, 43 | 78, 79 | SHIFT-L, SHIFT-R |
+| 44 | 80 | SPACE (wide bar) |
+
+### Differences vs NSR-1
+
+- **No pots, no data slider.** The 60 mm control is a **crossfader** on
+  **CC 26** (same channel/index as NSR-1's slider). Thumbstick stays:
+  CC 1 (Y / mod) and pitch bend (X), unchanged.
+- **32 LEDs** (one per grid key): brain → panel note on/off on channel 2,
+  note number = LED index **0–31** (row-major, same formula as NSR-1
+  extended to 4x8).
+- **Velocity source default = fixed 100** (`src` 0x08 @ 100) — the
+  crossfader is mix/performance duty by default; the brain may
+  SET_VELOCITY_SOURCE to 0x00 (crossfader) or 0x09 (host register) as
+  on NSR-1.
+- **REPLY feature mask gains bit 3 = "32-grid layout (NSR-2)"** so one
+  brain binary gates its grid mapping on the QUERY handshake.
+- MODE cycles three keyboard-row modes: **step → play → text** (NSR-1
+  has step ↔ play only). Play mode is a scale-locked isomorphic grid
+  (row up = +4 semitones, column = +1, base C3); text mode is a
+  QWERTY-flavored grid feeding the EditBox flow.
+
 ## Semantics live in the brain
 
 The panel is dumb: it reports physical events, nothing more. Key → musical

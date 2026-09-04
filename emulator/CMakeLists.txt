@@ -1,6 +1,30 @@
 cmake_minimum_required(VERSION 3.24)
 project(groovebox_sim LANGUAGES C CXX)
 
+# ── Version from git describe (configure-time) ──────────────────────
+# Runs 'git describe --tags --always --dirty' from the repo ROOT (the
+# emulator is a subdirectory of it). A 'vX.Y.Z' tag yields "X.Y.Z";
+# anything else (no tags yet, mid-history, dirty tree) is reported as
+# "0.0.0-<describe output>". NOTE: the version is captured at CONFIGURE
+# time — re-run cmake after tagging/committing to refresh it.
+set(GB_VERSION "0.0.0-unknown")
+execute_process(
+    COMMAND git describe --tags --always --dirty
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.."
+    OUTPUT_VARIABLE GB_GIT_DESCRIBE
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+    RESULT_VARIABLE GB_GIT_RESULT
+)
+if(GB_GIT_RESULT EQUAL 0 AND GB_GIT_DESCRIBE)
+    if(GB_GIT_DESCRIBE MATCHES "^v?([0-9]+\\.[0-9]+\\.[0-9]+)")
+        set(GB_VERSION "${CMAKE_MATCH_1}")
+    else()
+        set(GB_VERSION "0.0.0-${GB_GIT_DESCRIBE}")
+    endif()
+endif()
+message(STATUS "groovebox_sim version: ${GB_VERSION}")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -20,6 +44,7 @@ add_executable(groovebox_sim
     src/main.cpp
     src/SimBackend.cpp
     src/PanelView.cpp
+    src/PanelViewNSR2.cpp
     src/ui.cpp
     src/widgets.cpp
     src/widgetshowcase.cpp
@@ -49,6 +74,10 @@ target_link_libraries(groovebox_sim PRIVATE
 if(MSVC)
     target_compile_options(groovebox_sim PRIVATE /W3 /utf-8)
 endif()
+
+# Version string from git describe (see top of file).
+target_compile_definitions(groovebox_sim PRIVATE
+    GB_VERSION_STRING="${GB_VERSION}")
 
 # PortAudio builds SHARED on Windows; its DLL lands in yawn's
 # CMAKE_RUNTIME_OUTPUT_DIRECTORY (build/bin), not next to our exe.

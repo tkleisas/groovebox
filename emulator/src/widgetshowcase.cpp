@@ -16,7 +16,7 @@ namespace {
 // Layout: 240 px wide (device width), tall canvas; every widget bbox
 // on the 8 px grid, placement preferring 16 px multiples.
 constexpr int kW = 240;
-constexpr int kH = 776;
+constexpr int kH = 824;
 
 void label(Canvas565& c, Font5x7& font, int x, int y, const char* s) {
     c.text(font, x, y, 1, s, kColGray);
@@ -205,6 +205,15 @@ bool writeWidgetShowcasePng(const char* path) {
     EditBoxWidget eb3{8, 760, 112, 8, "", 0, 0, false, nullptr,
                       "UNTITLED"};
     eb3.draw(c, font);
+
+    // ── Toasts: worst-case long vs. short (auto-sized) ──────────────
+    label(c, font, 8, 776, "TOAST AUTO-SIZE");
+    // long: 1x label wins over the 2x value → box grows past the 96 min
+    ToastWidget tLong{24, 784, 96, 32, "Filter Resonance", "19.9k"};
+    tLong.draw(c, font);
+    // short: stays at the 96 minimum, still balanced
+    ToastWidget tShort{128, 784, 96, 32, "CUT", "87"};
+    tShort.draw(c, font);
 
     // RGB565 → RGB888 and write.
     std::vector<unsigned char> rgb(size_t(kW) * kH * 3);

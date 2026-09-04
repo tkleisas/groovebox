@@ -533,16 +533,34 @@ void FileBrowserWidget::draw(Canvas565& c, Font5x7& font) const {
 // ── ToastWidget ─────────────────────────────────────────────────────
 
 void ToastWidget::draw(Canvas565& c, Font5x7& font) const {
-    c.fill(x, y, w, h, kColBlack);
-    c.frame(x, y, w, h, kColWhite);
-    c.frame(x + 1, y + 1, w - 2, h - 2, kColWhite); // double border
+    auto roundUp8 = [](int v) { return (v + 7) & ~7; };
+    // content metrics: value at 2x (14 px), label at 1x (7 px)
+    const int valueW = valueText ? Canvas565::textWidth(valueText, 2) : 0;
+    const int labelW = label ? Canvas565::textWidth(label, 1) : 0;
+    const int contentW = valueW > labelW ? valueW : labelW;
+    // width: content + symmetric padding, rounded up to the 8px grid,
+    // at least the declared minimum, clamped to the screen with margin
+    int W = std::max(w, roundUp8(contentW + 16));
+    W = std::min(W, c.w - 16);
+    // height: 3 pad + 14 value + 4 gap + 7 label + 4 pad = 32 (grid ✓)
+    int H = std::max(h, roundUp8(3 + 14 + 4 + 7 + 4));
+    H = std::min(H, c.h - 16);
+    // recenter the computed box on the minimum box's center
+    int X = x + w / 2 - W / 2;
+    int Y = y + h / 2 - H / 2;
+    if (X < 4) X = 4;
+    if (Y < 4) Y = 4;
+
+    c.fill(X, Y, W, H, kColBlack);
+    c.frame(X, Y, W, H, kColWhite);
+    c.frame(X + 1, Y + 1, W - 2, H - 2, kColWhite); // double border
     if (valueText) {
         const int tw = Canvas565::textWidth(valueText, 2);
-        c.text(font, x + (w - tw) / 2, y + 5, 2, valueText, kColWhite);
+        c.text(font, X + (W - tw) / 2, Y + 3, 2, valueText, kColWhite);
     }
     if (label) {
         const int tw = Canvas565::textWidth(label, 1);
-        c.text(font, x + (w - tw) / 2, y + h - 10, 1, label, kColGray);
+        c.text(font, X + (W - tw) / 2, Y + 3 + 14 + 4, 1, label, kColGray);
     }
 }
 

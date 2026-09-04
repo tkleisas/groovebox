@@ -10,6 +10,7 @@
 
 #include "hal.h"
 #include "PanelView.h"
+#include "PanelViewNSR2.h"
 #include "font5x7.h"
 #include <vector>
 
@@ -23,25 +24,40 @@ class SimBackend : public Hal {
 public:
     ~SimBackend() override = default;
 
+    // Call BEFORE init(): selects the NSR-1 / NSR-2 faceplate.
+    void setPanelProfile(PanelProfile p) { m_profile = p; }
+
     bool init(HalHandler& handler) override;
     void shutdown() override;
     void poll() override;
     void presentFrame(const uint16_t* rgb565) override;
     void setLed(int index, bool on) override;
 
+    // test support: highest LED index ever addressed (NSR-2 = 32)
+    int ledMaxIndex() const { return m_ledMax; }
+
 private:
     HalHandler* m_handler = nullptr;
     SDL_Window* m_window = nullptr;
     SDL_Renderer* m_renderer = nullptr;
     SDL_Texture* m_texture = nullptr;       // screen view (240x160)
-    SDL_Texture* m_panelTexture = nullptr;  // panel view (1600x600)
+    SDL_Texture* m_panelTexture = nullptr;  // panel view (profile size)
+
+    PanelProfile m_profile = kPanelNSR1;
+    int panelW() const {
+        return m_profile == kPanelNSR2 ? PanelViewNSR2::kW : PanelView::kW;
+    }
+    int panelH() const {
+        return m_profile == kPanelNSR2 ? PanelViewNSR2::kH : PanelView::kH;
+    }
 
     bool m_panelMode = true;
     Font5x7 m_panelFont;
     PanelState m_panel;
-    std::vector<uint16_t> m_panelFb;        // PanelView::kW*kH
+    std::vector<uint16_t> m_panelFb;        // panelW()*panelH()
 
-    bool m_leds[kNumLeds] = {};
+    bool m_leds[kMaxLeds] = {};
+    int m_ledMax = -1;
 
     // Simulated analog state. Pot defaults mirror the UI mockup values.
     int m_selectedPot = 0;

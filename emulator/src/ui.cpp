@@ -79,7 +79,8 @@ void Ui::drawHeader(const UiState& s, uint16_t* fb) {
     text(fb, 4, 1, 2, title, kColBlack);
     if (s.page == 1) {
         // SEQ page: keys mode marker + live transport clock (inverse).
-        text(fb, 44, 1, 2, s.mode == 0 ? "P" : "S", kColBlack);
+        text(fb, 44, 1, 2, s.mode == 0 ? "P" : s.mode == 1 ? "S" : "T",
+             kColBlack);
         Canvas565 c{fb, kDisplayW, kDisplayH};
         TransportClockWidget clk{88, 0, s.clockBar, s.clockBeat,
                                  s.clockStep, s.clockPhase, true};
@@ -88,7 +89,7 @@ void Ui::drawHeader(const UiState& s, uint16_t* fb) {
         // transport / mode marker
         const char* marker = s.recording ? "R" : (s.playing ? ">" : "");
         if (*marker) text(fb, 96, 1, 2, marker, kColBlack);
-        text(fb, 112, 1, 2, s.mode == 0 ? "PLAY" : "SEQ", kColBlack);
+        text(fb, 112, 1, 2, s.mode == 0 ? "PLAY" : s.mode == 1 ? "SEQ" : "TEXT", kColBlack);
     }
     // right-aligned track + BPM
     char right[16];
@@ -192,8 +193,9 @@ void Ui::pageLoad(const UiState& s, uint16_t* fb) {
 }
 
 void Ui::pageSettings(const UiState& s, uint16_t* fb) {
-    static const char* kNames[3] = {"THEME", "VEL SRC", "LED DIM"};
-    for (int i = 0; i < 3; ++i) {
+    static const char* kNames[4] = {"THEME", "VEL SRC", "LED DIM",
+                                    "SCALE"};
+    for (int i = 0; i < 4; ++i) {
         const int y0 = 32 + i * 16;
         const bool sel = (i == s.settingsSel);
         if (sel) fill(fb, 0, y0, kDisplayW, 16, kColWhite);
@@ -204,11 +206,24 @@ void Ui::pageSettings(const UiState& s, uint16_t* fb) {
                  sel ? kColBlack : kColWhite, sel, kColWhite);
         }
     }
-    text(fb, 8, 96, 1, "E1 SEL  E2 ADJ  S2 SAVE", kColDim);
+    text(fb, 8, 104, 1, "E1 SEL  E2 ADJ  S2 SAVE", kColDim);
 }
 
 void Ui::pageSeq(const UiState& s, uint16_t* fb) {
     Canvas565 c{fb, kDisplayW, kDisplayH};
+    // NSR-2 text-entry mode: the grid becomes a quasi-keyboard feeding
+    // an EditBox (pattern-name target for now).
+    if (s.nsr2 && s.mode == 2) {
+        text(fb, 8, 24, 1, "PATTERN NAME", kColDim);
+        EditBoxWidget eb{8, 32, 224, 16,
+                         s.textBuf ? s.textBuf : "", s.textCursor, 0,
+                         true, nullptr, "TYPE ON GRID..."};
+        eb.draw(c, m_font);
+        text(fb, 8, 56, 1, "ROWS: QWERTYUI/ASDFGHJK/ZXCVBNM", kColDim);
+        text(fb, 8, 64, 1, "SPACE=bar  BKSP=key29  ENTER=key31", kColDim);
+        text(fb, 8, 72, 1, "MODE -> back to STEP", kColDim);
+        return;
+    }
     // row labels (inverse = selected track, dim = muted)
     static const char* kRowNames[4] = {"T1", "T2", "T3", "T4"};
     for (int r = 0; r < s.seq.rows && r < 4; ++r) {
@@ -284,6 +299,8 @@ void Ui::renderSplash(uint16_t* fb) {
          kColGray);
     const char* sub = "YAWN ENGINE // 48000 Hz";
     text(fb, (kDisplayW - textWidth(sub, 1)) / 2, 132, 1, sub, kColDim);
+    text(fb, (kDisplayW - textWidth(GB_VERSION_STRING, 1)) / 2, 144, 1,
+         GB_VERSION_STRING, kColDim);
 }
 
 void Ui::render(const UiState& s, uint16_t* fb) {

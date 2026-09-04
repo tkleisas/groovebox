@@ -21,6 +21,39 @@ constexpr int kDisplayH = 160;
 
 constexpr int kNumEncoders = 4;
 constexpr int kNumLeds     = 16;
+constexpr int kMaxLeds     = 32; // NSR-2 grid
+
+// Panel profiles: NSR-1 (400x150 landscape, 39 piano keys) vs NSR-2
+// (180x210 portrait, 45 keys, 4x8 grid). Selected by --panel= at app
+// level; the backend renders the matching faceplate.
+enum PanelProfile { kPanelNSR1 = 0, kPanelNSR2 = 1 };
+
+// ── NSR-2 panel key indices (docs/nsr2-design.md, panel-protocol) ───
+//  0..31  grid keys, row-major (top-left = 0)
+// 32..34 transport: PLAY, STOP, REC
+// 35     MODE
+// 36..37 < and >
+// 38..41 soft keys S1..S4
+// 42..43 SHIFT-L, SHIFT-R
+// 44     SPACE (wide bar)
+enum KeyNSR2 {
+    kN2Grid0  = 0,
+    kN2Play   = 32,
+    kN2Stop   = 33,
+    kN2Rec    = 34,
+    kN2Mode   = 35,
+    kN2Prev   = 36,
+    kN2Next   = 37,
+    kN2Soft1  = 38,
+    kN2Soft2  = 39,
+    kN2Soft3  = 40,
+    kN2Soft4  = 41,
+    kN2ShiftL = 42,
+    kN2ShiftR = 43,
+    kN2Space  = 44,
+    kN2NumKeys = 45,
+    kN2NumLeds = 32,
+};
 
 // ── Panel key indices (docs/panel-protocol.md) ──────────────────────
 //  0..15  white keys (C D E F G A B | C D E F G A B C D — two octaves)

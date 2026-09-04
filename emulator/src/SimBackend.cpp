@@ -18,9 +18,12 @@ bool SimBackend::init(HalHandler& handler) {
         std::fprintf(stderr, "[sim] SDL_Init failed: %s\n", SDL_GetError());
         return false;
     }
-    m_window = SDL_CreateWindow("groovebox_sim — yawn engine emulator",
-                                PanelView::kW, PanelView::kH,
-                                SDL_WINDOW_RESIZABLE);
+    const int pw = panelW(), ph = panelH();
+    m_window = SDL_CreateWindow(
+        m_profile == kPanelNSR2
+            ? "groovebox_sim — NSR-2 panel — yawn engine emulator"
+            : "groovebox_sim — NSR-1 panel — yawn engine emulator",
+        pw, ph, SDL_WINDOW_RESIZABLE);
     if (!m_window) {
         std::fprintf(stderr, "[sim] SDL_CreateWindow failed: %s\n", SDL_GetError());
         return false;
@@ -35,14 +38,14 @@ bool SimBackend::init(HalHandler& handler) {
                                   kDisplayW, kDisplayH);
     m_panelTexture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_RGB565,
                                        SDL_TEXTUREACCESS_STREAMING,
-                                       PanelView::kW, PanelView::kH);
+                                       pw, ph);
     if (!m_texture || !m_panelTexture) {
         std::fprintf(stderr, "[sim] SDL_CreateTexture failed: %s\n", SDL_GetError());
         return false;
     }
     SDL_SetTextureScaleMode(m_texture, SDL_SCALEMODE_NEAREST);
     SDL_SetTextureScaleMode(m_panelTexture, SDL_SCALEMODE_NEAREST);
-    m_panelFb.resize(size_t(PanelView::kW) * PanelView::kH, 0);
+    m_panelFb.resize(size_t(pw) * ph, 0);
     // panel mirror starts from the simulated analog defaults
     for (int i = 0; i < 6; ++i) m_panel.pots[i] = m_pots[i];
     m_panel.slider = m_slider;
@@ -61,6 +64,7 @@ void SimBackend::shutdown() {
 void SimBackend::printLegend() const {
     std::printf(
         "[sim] ── panel view (default; F11 toggles screen-only) ─────────\n"
+        "[sim] profiles: --panel=nsr1 (piano panel) / --panel=nsr2 (grid)\n"
         "[sim] pages: SYNTH SEQ MIXER FX SAMPLE LOAD SET (< > cycle)\n"
         "[sim] mouse: click/hold keys & buttons = panel key events\n"
         "[sim]        pots = vertical drag or wheel over knob\n"
@@ -194,7 +198,9 @@ bool SimBackend::windowToLogical(float wx, float wy, float& lx,
 
 void SimBackend::mouseDownPanel(float lx, float ly) {
     const PanelView::Hit hit =
-        PanelView::hitTest(int(lx + 0.5f), int(ly + 0.5f));
+        m_profile == kPanelNSR2
+            ? PanelViewNSR2::hitTest(int(lx + 0.5f), int(ly + 0.5f))
+            : PanelView::hitTest(int(lx + 0.5f), int(ly + 0.5f));
     m_dragType = hit.type;
     m_dragIndex = hit.index;
     m_panel.activeType = hit.type;
@@ -209,10 +215,18 @@ void SimBackend::mouseDownPanel(float lx, float ly) {
         m_dragStartY = ly;
         break;
     case PanelView::kHitSlider:
-        setSlider((lx - 310 * 4) / float(62 * 4));
+        if (m_profile == kPanelNSR2) // vertical crossfader: top = 1
+            setSlider(1.0f - (ly - 133 * 4) / float(52 * 4));
+        else
+            setSlider((lx - 310 * 4) / float(62 * 4));
         break;
     case PanelView::kHitJoy:
-        emitJoy((lx - 18 * 4) / float(10 * 4), -(ly - 105 * 4) / float(10 * 4));
+        if (m_profile == kPanelNSR2)
+            emitJoy((lx - 17 * 4) / float(9 * 4),
+                    -(ly - 158 * 4) / float(9 * 4));
+        else
+            emitJoy((lx - 18 * 4) / float(10 * 4),
+                    -(ly - 105 * 4) / float(10 * 4));
         break;
     case PanelView::kHitEncoder:
         m_encAccum = 0.0f;
@@ -230,10 +244,18 @@ void SimBackend::mouseMovePanel(float lx, float ly) {
         setPot(m_dragIndex, m_dragStartVal + (m_dragStartY - ly) / 120.0f);
         break;
     case PanelView::kHitSlider:
-        setSlider((lx - 310 * 4) / float(62 * 4));
+        if (m_profile == kPanelNSR2)
+            setSlider(1.0f - (ly - 133 * 4) / float(52 * 4));
+        else
+            setSlider((lx - 310 * 4) / float(62 * 4));
         break;
     case PanelView::kHitJoy:
-        emitJoy((lx - 18 * 4) / float(10 * 4), -(ly - 105 * 4) / float(10 * 4));
+        if (m_profile == kPanelNSR2)
+            emitJoy((lx - 17 * 4) / float(9 * 4),
+                    -(ly - 158 * 4) / float(9 * 4));
+        else
+            emitJoy((lx - 18 * 4) / float(10 * 4),
+                    -(ly - 105 * 4) / float(10 * 4));
         break;
     case PanelView::kHitEncoder: {
         m_encAccum += m_dragStartY - ly;
@@ -271,7 +293,9 @@ void SimBackend::mouseUpPanel(float lx, float ly) {
 
 void SimBackend::wheelPanel(float lx, float ly, int delta) {
     const PanelView::Hit hit =
-        PanelView::hitTest(int(lx + 0.5f), int(ly + 0.5f));
+        m_profile == kPanelNSR2
+            ? PanelViewNSR2::hitTest(int(lx + 0.5f), int(ly + 0.5f))
+            : PanelView::hitTest(int(lx + 0.5f), int(ly + 0.5f));
     if (hit.type == PanelView::kHitPot)
         adjustPot(hit.index, delta * 0.05f);
     else if (hit.type == PanelView::kHitEncoder && delta != 0)
@@ -383,12 +407,15 @@ void SimBackend::presentFrame(const uint16_t* rgb565) {
     for (int i = 0; i < kNumLeds; ++i) m_panel.leds[i] = m_leds[i];
 
     if (m_panelMode) {
-        Canvas565 c{m_panelFb.data(), PanelView::kW, PanelView::kH};
-        PanelView::render(c, m_panelFont, m_panel, rgb565);
+        const int pw = panelW(), ph = panelH();
+        Canvas565 c{m_panelFb.data(), pw, ph};
+        if (m_profile == kPanelNSR2)
+            PanelViewNSR2::render(c, m_panelFont, m_panel, rgb565);
+        else
+            PanelView::render(c, m_panelFont, m_panel, rgb565);
         SDL_UpdateTexture(m_panelTexture, nullptr, m_panelFb.data(),
-                          PanelView::kW * int(sizeof(uint16_t)));
-        SDL_SetRenderLogicalPresentation(m_renderer, PanelView::kW,
-                                         PanelView::kH,
+                          pw * int(sizeof(uint16_t)));
+        SDL_SetRenderLogicalPresentation(m_renderer, pw, ph,
                                          SDL_LOGICAL_PRESENTATION_LETTERBOX);
         SDL_RenderClear(m_renderer);
         SDL_RenderTexture(m_renderer, m_panelTexture, nullptr, nullptr);
@@ -405,7 +432,8 @@ void SimBackend::presentFrame(const uint16_t* rgb565) {
 }
 
 void SimBackend::setLed(int index, bool on) {
-    if (index < 0 || index >= kNumLeds) return;
+    if (index < 0 || index >= kMaxLeds) return;
+    if (index > m_ledMax) m_ledMax = index;
     m_leds[index] = on;
 }
 

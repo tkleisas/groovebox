@@ -245,11 +245,16 @@ struct FileBrowserWidget {
 };
 
 // ── ToastWidget ─────────────────────────────────────────────────────
-// Centered overlay box for transient encoder feedback: bright frame
-// over black fill, big value text (2x) + small dim label. Reads over
-// any page.
+// Centered overlay box for transient encoder feedback: bright double
+// border over black fill, big value text (2x) + small dim label.
+// AUTO-SIZED to content: width = max(value line at 2x, label line at
+// 1x) measured UTF-8-aware, + symmetric padding, rounded UP to the 8px
+// grid, clamped to the screen with an 8px margin. The w/h fields are
+// MINIMUMS — the widget computes its final size from content and
+// recenters the computed box on the minimum box's center, so existing
+// {72, 48, 96, 32} call sites keep their screen-center placement.
 struct ToastWidget {
-    int x = 0, y = 0, w = 96, h = 32;
+    int x = 0, y = 0, w = 96, h = 32;  // minimum box (its center is kept)
     const char* label = nullptr;
     const char* valueText = nullptr;
     void draw(Canvas565& c, Font5x7& font) const;
