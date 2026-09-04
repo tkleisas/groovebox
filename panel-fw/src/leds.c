@@ -13,6 +13,10 @@ static uint8_t ram[16];
 static bool dirty;
 static int quiesce;   // periodic re-flush counter (corruption self-heal)
 
+static void cmd(uint8_t c) {
+    i2c_write_blocking(PANEL_I2C, HT16K33_ADDR, &c, 1, false);
+}
+
 static void flush(void) {
     uint8_t buf[17];
     buf[0] = 0x00;                       // pointer + autoincrement
@@ -21,8 +25,13 @@ static void flush(void) {
 }
 
 void leds_init(void) {
+    // The chip boots in standby (oscillator off, display off): without these
+    // writes RAM updates land but no LED ever lights.
+    cmd(0x21);                           // system setup: oscillator on
+    cmd(0xE0 | 8);                       // dimming set: brightness 8/16
+    cmd(0x81);                           // display setup: on, no blink
     for (int i = 0; i < 16; i++) ram[i] = 0;
-    dirty = false;
+    dirty = true;                        // push the cleared RAM on first tick
     quiesce = 0;
 }
 
@@ -37,5 +46,5 @@ void leds_set(uint8_t index, bool on) {
 
 void leds_tick(void) {
     if (dirty) { flush(); dirty = false; quiesce = 0; return; }
-    if (++quiesce >= 256) { flush(); quiesce = 0; }   // ~4 s re-assert
+    if (++quiesce >= 256) { flush(); quiesce = 0; }   // ~0.25 s re-assert
 }

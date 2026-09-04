@@ -19,7 +19,7 @@ namespace gb {
 
 struct UiParam {
     const char* name;
-    int value; // 0..127
+    int value; // 0..127; -1 = unbound (renders dim "—")
 };
 
 struct UiState {
@@ -67,6 +67,39 @@ struct UiState {
     SequencerWidget seq;
     StepLaneWidget lane;   // per-step velocity of the selected track
     MixerWidget mixer;
+
+    // FX page (page 3): one insert effect slot on the selected track.
+    const char* fxName = nullptr;  // nullptr = EMPTY
+    bool fxBypassed = false;
+    UiParam fxParams[4] = {};      // first 4 effect params (-1 unbound)
+    // effect chooser (ListWidget overlay on the FX page)
+    bool chooserOpen = false;
+    const char* const* chooserItems = nullptr;
+    int chooserCount = 0;
+    int chooserSel = 0;
+    int chooserScroll = 0;
+
+    // SAMPLE page (page 4)
+    int sampleState = 0;      // 0 idle, 1 recording, 2 review
+    float sampleLevel = 0;    // input peak 0..1
+    float sampleElapsed = 0;  // seconds recorded
+    const float* sampleWave = nullptr;
+    int sampleWaveLen = 0;
+    float sampleTrim0 = 0.0f, sampleTrim1 = 1.0f;
+    float sampleGain = 1.0f;
+    const char* sampleMsg = nullptr; // e.g. "NO INPUT"
+
+    // LOAD page (page 5): file browser state
+    FileBrowserWidget browser;
+
+    // SETTINGS page (page 6)
+    int settingsSel = 0;               // 0..2
+    const char* settingsVal[3] = {};   // value strings per row
+
+    // confirm dialog overlay
+    bool dialogActive = false;
+    const char* dlgTitle = nullptr;
+    const char* dlgLine = nullptr;
 };
 
 class Ui {
@@ -84,9 +117,14 @@ private:
     void drawHeader(const UiState& s, uint16_t* fb);
     void drawLeds(const UiState& s, uint16_t* fb);
     void drawFooter(const UiState& s, uint16_t* fb);
+    void drawParamRow(const UiParam& p, int y0, bool sel, uint16_t* fb);
     void pageSynth(const UiState& s, uint16_t* fb);
     void pageSeq(const UiState& s, uint16_t* fb);
     void pageMixer(const UiState& s, uint16_t* fb);
+    void pageFx(const UiState& s, uint16_t* fb);
+    void pageSample(const UiState& s, uint16_t* fb);
+    void pageLoad(const UiState& s, uint16_t* fb);
+    void pageSettings(const UiState& s, uint16_t* fb);
 
     static void fill(uint16_t* fb, int x, int y, int w, int h, uint16_t c);
     static void frame(uint16_t* fb, int x, int y, int w, int h, uint16_t c);

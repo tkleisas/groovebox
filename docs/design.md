@@ -60,7 +60,8 @@ Consequences:
 | Mic | Electret capsule behind top-panel hole → codec mic input | $2 |
 | Display | 4.0" SPI TFT 480×320 (ILI9488) — bigger pixels for eyesight; same driver, bus and 240×160@2× UI as 3.5" | $18 |
 | MX keyboard kit | 39 MX-style switches (Gateron Red / Silent Red, linear ~45 gf) + Kailh hot-swap sockets + keycap set (16 white, 11 black, colored for transport/shift/mode) + 39× 1N4148 diodes | $55 |
-| Button/LED driver | HT16K33 (key scan + LED drive, I2C) | $3 |
+| Button/LED driver | HT16K33 (I2C, in-switch LED driver) | $3 |
+| Key input expanders | 3× MCP23017 (I2C @ 0x20–0x22, 39 single-ended key inputs) | $6 |
 | Analog inputs | 3× ADS1115 16-bit ADC (I2C, addresses 0x48 / 0x49 / 0x4a) | $9 |
 | Pitch/mod | 2-axis spring-return thumbstick (X = pitch bend, Y = mod) | $4 |
 | Pots | 6× 10k linear: cutoff, resonance, A, D, S, R | $7 |
@@ -128,6 +129,7 @@ keyboard's right end. The empty center holds the ВОКОИТЕР – ΟΡΓΑΝ
 | Peripheral | Connection | Role |
 |---|---|---|
 | HT16K33 | I2C @ 0x70 | 16 in-switch LEDs (driver only — rev A key scan moved to expanders) |
+| 3× MCP23017 | I2C @ 0x20 / 0x21 / 0x22 | 39 key inputs, single-ended (48 available) |
 | 3× ADS1115 | I2C @ 0x48 / 0x49 / 0x4a | 9 analog inputs: 6 pots + slider + joystick (X/Y) |
 | 4 encoders | direct GPIO (12 pins) | quadrature + push |
 
@@ -171,19 +173,20 @@ controller mapping in emulator → M3 cross-compile to Pi, Pi HAL backend,
 CPU profiling (Zero 2W viability gate) → M4 bench rig → M5 battery +
 enclosure.
 
-**Panel module (Raspberry Pi Pico).** All panel I/O — 39-key MX matrix
-(with diodes), 16 in-switch LEDs, 4 encoders, 2× ADS1115 analog — is
-handled by a Pico (RP2040, native USB device via TinyUSB) which presents
-itself to the Pi as a **USB-MIDI controller**. Keys → note on/off,
-pots/slider/joystick → CCs, encoders → relative CCs; LEDs are driven by
-MIDI back to the panel. The HT16K33 and ADS1115s stay as I2C peripherals
-with the Pico as bus master (Pico's 26 GPIO can't absorb 39 keys + 16 LEDs
-+ 12 encoder pins directly). Benefits: no custom I/O drivers on the Pi
-(yawn's RtMidi sees a stock USB-MIDI device), jitter-free scanning, and a
-panel that is independently testable on any MIDI host (PC/DAW) and
-swappable as a unit. The Pi's USB-OTG port goes to the panel; external
-keyboards use DIN MIDI in. The Pico firmware is a small, separate codebase
-(matrix scan + debounce + quadrature + ADS1115 poll + TinyUSB MIDI).
+**Panel module (Raspberry Pi Pico).** All panel I/O — 39 single-ended keys
+on 3× MCP23017, 16 in-switch LEDs on HT16K33 (driver only), 4 encoders,
+3× ADS1115 analog — is handled by a Pico (RP2040, native USB device via
+TinyUSB) which presents itself to the Pi as a **USB-MIDI controller**. Keys
+→ note on/off, pots/slider/joystick → CCs, encoders → relative CCs; LEDs
+are driven by MIDI back to the panel; a SysEx layer (protocol doc)
+configures velocity-source routing with capability handshake and optional
+flash persistence. The Pico is I2C bus master for all expanders (its 26
+GPIO can't absorb keys + LEDs + encoders directly). Benefits: no custom
+I/O drivers on the Pi (yawn's RtMidi sees a stock USB-MIDI device),
+jitter-free scanning, and a panel that is independently testable on any
+MIDI host (PC/DAW) and swappable as a unit. The Pi's USB-OTG port goes to
+the panel; external keyboards use DIN MIDI in. Firmware: `panel-fw/`
+(builds to `panel.uf2` via pico-sdk; see `panel-fw/README.md`).
 
 ```
 ┌─ Input thread (libgpiod: encoders | HT16K33: buttons | ADS1115×2: pots/slider)

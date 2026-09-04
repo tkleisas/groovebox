@@ -4,14 +4,15 @@
 #include "hardware/i2c.h"
 #include "pico/stdlib.h"
 
-// Three ADS1115 in continuous mode, 860 SPS, +/-2.048 V PGA. Each 1 ms tick
+// Three ADS1115 in continuous mode, 860 SPS, +/-4.096 V PGA. Each 1 ms tick
 // reads one chip (last conversion) and advances its MUX, so every channel
 // refreshes about every 12 ms (~83 Hz) — ample for pots and bend.
+// Single-ended 16-bit reads: raw spans 0..32767 (0 V..PGA full scale).
 
 #define DR_860        0x07
-#define PGA_2048      0x01    // +/-2.048 V
+#define PGA_4096      0x01    // +/-4.096 V (value 0x01; 0x02 would be +/-2.048 V)
 #define ADS_CONFIG(mux) (uint16_t)(0x8000 | ((4 + (mux)) << 12) | \
-                        (PGA_2048 << 9) | (0u << 8) | (DR_860 << 5))
+                        (PGA_4096 << 9) | (0u << 8) | (DR_860 << 5))
 
 static const uint8_t chip_addr[3] = { ADS_ADDR_CH0, ADS_ADDR_CH1, ADS_ADDR_CH2 };
 static const int8_t ch_map[3][4] = {
@@ -35,10 +36,11 @@ static void process_channel(uint8_t ch, uint16_t raw) {
     if (ch == ADS_JOY_X) {                       // pitch bend, spring-centered
         static uint16_t bend = 8192;
         uint16_t b;
-        if (raw + 28 >= 2048 && raw < 2048 + 28) b = 8192;   // snap zone
+        const uint16_t center = ADS_FULL_SCALE_RAW / 2;          // 13200
+        if (raw >= center - 300 && raw <= center + 300) b = 8192;  // snap to center
         else {
-            const int v = 8192 + (int)raw * 8 - 2048 * 8;
-            b = (uint16_t)(v < 0 ? 0 : v > 16383 ? 16383 : v);
+            b = (uint16_t)((uint32_t)raw * 16383 / ADS_FULL_SCALE_RAW);
+            if (b > 16383) b = 16383;            // raw above full scale: clamp
         }
         if (b != 8192 && b > bend - 32 && b < bend + 32) return;
         if (b == bend) return;
@@ -48,11 +50,13 @@ static void process_channel(uint8_t ch, uint16_t raw) {
     }
     const uint16_t diff = raw > last_sent[ch] ? raw - last_sent[ch]
                                               : last_sent[ch] - raw;
-    if (diff < (ch == ADS_JOY_Y ? 8u : 4u)) return;          // hysteresis
+    if (diff < (ch == ADS_JOY_Y ? 128u : 64u)) return;           // hysteresis
     last_sent[ch] = raw;
     const uint8_t cc = ch <= ADS_POT5 ? (uint8_t)(20 + ch)
                      : ch == ADS_SLIDER ? 26 : 1;
-    midi_send_cc(0, cc, (uint8_t)(raw >> 5));
+    uint8_t v = (uint8_t)((uint32_t)raw * 127 / ADS_FULL_SCALE_RAW);
+    if (v > 127) v = 127;                        // raw above full scale: clamp
+    midi_send_cc(0, cc, v);
 }
 
 void ads_init(void) {

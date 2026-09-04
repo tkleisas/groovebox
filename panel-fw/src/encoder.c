@@ -2,6 +2,7 @@
 #include "board_config.h"
 #include "midi.h"
 #include "hardware/gpio.h"
+#include "hardware/sync.h"
 #include "pico/stdlib.h"
 
 // Quadrature: full 4-state table on A/B edges (IRQ), detents emitted from
@@ -48,8 +49,15 @@ static void irq_cb(uint gpio, uint32_t events) {
 
 void encoder_tick(void) {
     for (unsigned e = 0; e < ENC_NUM; e++) {
-        while (delta[e] > 0)  { midi_send_cc(0, (uint8_t)(16 + e), 65); delta[e]--; }
-        while (delta[e] < 0)  { midi_send_cc(0, (uint8_t)(16 + e), 63); delta[e]++; }
+        // Read-and-clear under a critical section: the GPIO IRQ accumulates
+        // into delta[e], and a plain read/decrement loop here could lose
+        // transitions that land between the test and the update.
+        const uint32_t irq = save_and_disable_interrupts();
+        int d = delta[e];
+        delta[e] = 0;
+        restore_interrupts(irq);
+        while (d > 0)  { midi_send_cc(0, (uint8_t)(16 + e), 65); d--; }
+        while (d < 0)  { midi_send_cc(0, (uint8_t)(16 + e), 63); d++; }
 
         const bool pressed = !gpio_get(ENC_SW_PIN[e]);
         if (pressed != sw_stable[e]) {

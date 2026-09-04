@@ -5,7 +5,8 @@
 #include "hardware/i2c.h"
 #include "pico/stdlib.h"
 
-#define DEBOUNCE_TICKS  8       // 8 ms, uniform for every key
+#define DEBOUNCE_TICKS  8       // ~24 ms (8 hits at one scan per chip per 3 ms),
+                                // uniform for every key
 
 // MCP23017 registers (BANK=0, sequential A then B)
 #define MCP_IODIRA   0x00

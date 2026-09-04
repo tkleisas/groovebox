@@ -24,6 +24,7 @@ add_executable(groovebox_sim
     src/widgets.cpp
     src/widgetshowcase.cpp
     src/fontchart.cpp
+    src/sampleio.cpp
     # With YAWN_HAS_LINK=OFF, yawn/CMakeLists.txt does not compile
     # src/link/LinkManager.cpp, but AudioEngine.cpp references the
     # LinkManager stub unconditionally. Compile that same file here

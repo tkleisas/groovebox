@@ -1,10 +1,12 @@
 // groovebox-panel firmware entry point.
-// Superloop + 1 ms tick: USB MIDI via TinyUSB, HT16K33 key scan, 3x ADS1115
-// analog polling, quadrature encoders, LED output, GRV config service.
+// Superloop + 1 ms tick: USB MIDI via TinyUSB, 3x MCP23017 key scan, 3x
+// ADS1115 analog polling, quadrature encoders, HT16K33 LED output, GRV
+// config service. Watchdog (4 s) kicked every loop iteration.
 
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "hardware/gpio.h"
+#include "hardware/watchdog.h"
 #include "tusb.h"
 
 #include "ads1115.h"
@@ -29,9 +31,11 @@ int main(void) {
     ads_init();
     encoder_init();
     tusb_init();
+    watchdog_enable(4000, true);    // 4 s, paused while a debugger is attached
 
     absolute_time_t next_tick = make_timeout_time_ms(1);
     while (true) {
+        watchdog_update();
         tud_task();
         midi_task();
         if (time_reached(next_tick)) {

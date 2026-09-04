@@ -61,6 +61,7 @@ void SimBackend::shutdown() {
 void SimBackend::printLegend() const {
     std::printf(
         "[sim] ── panel view (default; F11 toggles screen-only) ─────────\n"
+        "[sim] pages: SYNTH SEQ MIXER FX SAMPLE LOAD SET (< > cycle)\n"
         "[sim] mouse: click/hold keys & buttons = panel key events\n"
         "[sim]        pots = vertical drag or wheel over knob\n"
         "[sim]        slider = horizontal drag; joystick = 2D drag\n"
@@ -73,8 +74,11 @@ void SimBackend::printLegend() const {
         "[sim] transport  : Space=play/stop  Backspace=stop  Enter=rec\n"
         "[sim] MODE=Tab   <=Left-Arrow  >=Right-Arrow  SHIFT=Left/Right Shift\n"
         "[sim] soft keys  : F1..F4 = S1..S4 (page-specific; S3/S4 = TRK-/TRK+\n"
-        "[sim]                   everywhere; SYNTH: S1/S2=OCT-/+; MIXER:\n"
-        "[sim]                   S1=MUTE selected)\n"
+        "[sim]                   everywhere; SYNTH: S1=OCT-(shift OCT+),\n"
+        "[sim]                   S2=PG+ param pages OSC/MOD/MISC; MIXER:\n"
+        "[sim]                   S1=MUTE selected; FX: S1=LOAD S2=BYP)\n"
+        "[sim] ownership   : 6 pots own filter/amp params (cut/res/ADSR);\n"
+        "[sim]                   encoders own everything else (no overlap)\n"
         "[sim] shift layer : hold Shift + white 1-4 = select track,\n"
         "[sim]                   + white 5-8 = mute track; shift+</> = BPM\n"
         "[sim]                   (SEQ page: page the 16-step window)\n"

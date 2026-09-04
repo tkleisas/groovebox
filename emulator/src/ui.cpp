@@ -48,10 +48,34 @@ int Ui::text(uint16_t* fb, int x, int y, int scale, const char* s,
 
 // ── Shared chrome ───────────────────────────────────────────────────
 
+// One parameter row (dim name, bright right-aligned value, bar).
+// value < 0 → unbound: dim "—", no bar. y0 = row top (16 px stride).
+void Ui::drawParamRow(const UiParam& p, int y0, bool sel, uint16_t* fb) {
+    if (sel) fill(fb, 0, y0, kDisplayW, 16, kColWhite);
+    const uint16_t fg     = sel ? kColBlack : kColWhite;
+    const uint16_t dimCol = sel ? kColBlack : kColGray;
+    text(fb, 4, y0 + 1, 2, p.name, dimCol);
+    if (p.value < 0) {
+        text(fb, 112, y0 + 1, 2, "-", sel ? kColBlack : kColDim);
+        return;
+    }
+    char val[8];
+    std::snprintf(val, sizeof(val), "%d", p.value);
+    // right-aligned value ending at x=124, bar starts at 132 (spacing
+    // fix: SUSTAIN/RELEASE rows' bars no longer touch 3-digit values)
+    text(fb, 124 - textWidth(val, 2), y0 + 1, 2, val, fg, sel, kColWhite);
+    const int bx = 132, bw = 102, by = y0 + 4, bh = 8;
+    frame(fb, bx, by, bw, bh, fg);
+    const int fw = (bw - 2) * p.value / 127;
+    if (fw > 0) fill(fb, bx + 1, by + 1, fw, bh - 2, fg);
+}
+
 void Ui::drawHeader(const UiState& s, uint16_t* fb) {
     fill(fb, 0, 0, kDisplayW, 16, kColWhite);
     const char* title = s.page == 1 ? "SEQ" : s.page == 2 ? "MIXER"
-                                                          : s.pageName;
+                      : s.page == 3 ? "FX" : s.page == 4 ? "SAMPLE"
+                      : s.page == 5 ? "LOAD" : s.page == 6 ? "SET"
+                      : s.pageName;
     text(fb, 4, 1, 2, title, kColBlack);
     if (s.page == 1) {
         // SEQ page: keys mode marker + live transport clock (inverse).
@@ -94,27 +118,93 @@ void Ui::drawFooter(const UiState& s, uint16_t* fb) {
 // ── Pages ───────────────────────────────────────────────────────────
 
 void Ui::pageSynth(const UiState& s, uint16_t* fb) {
-    for (int i = 0; i < 6; ++i) {
-        const int y0 = 18 + i * 16;
-        const bool sel = (i == s.selected);
-        if (sel) fill(fb, 0, y0, kDisplayW, 16, kColWhite);
-        const uint16_t fg     = sel ? kColBlack : kColWhite;
-        const uint16_t dimCol = sel ? kColBlack : kColGray;
-        text(fb, 4, y0 + 1, 2, s.params[i].name, dimCol);
-        char val[8];
-        std::snprintf(val, sizeof(val), "%d", s.params[i].value);
-        text(fb, 92, y0 + 1, 2, val, fg, sel, kColWhite);
-        // bar: outline + proportional fill
-        const int bx = 132, bw = 102, by = y0 + 4, bh = 8;
-        frame(fb, bx, by, bw, bh, fg);
-        const int fw = (bw - 2) * s.params[i].value / 127;
-        if (fw > 0) fill(fb, bx + 1, by + 1, fw, bh - 2, fg);
-    }
+    for (int i = 0; i < 6; ++i)
+        drawParamRow(s.params[i], 18 + i * 16, i == s.selected, fb);
     // Optional UTF-8 overlay line (demo / status)
     if (s.overlayLine) {
         text(fb, (kDisplayW - textWidth(s.overlayLine, 1)) / 2, 132, 1,
              s.overlayLine, kColWhite);
     }
+}
+
+void Ui::pageFx(const UiState& s, uint16_t* fb) {
+    // effect name (or EMPTY) + bypass tag
+    if (s.fxName) {
+        text(fb, 16, 24, 2, s.fxName, kColWhite);
+        if (s.fxBypassed) text(fb, 16, 44, 1, "BYPASSED", kColDim);
+    } else {
+        text(fb, 16, 24, 2, "EMPTY", kColDim);
+        text(fb, 16, 44, 1, "S1 = CHOOSE EFFECT", kColDim);
+    }
+    for (int i = 0; i < 4; ++i) {
+        if (s.fxParams[i].name)
+            drawParamRow(s.fxParams[i], 56 + i * 16, false, fb);
+    }
+    // effect chooser overlay
+    if (s.chooserOpen && s.chooserItems) {
+        Canvas565 c{fb, kDisplayW, kDisplayH};
+        ListWidget list{56, 24, 128, 96, s.chooserItems, s.chooserCount,
+                        s.chooserSel, s.chooserScroll};
+        list.draw(c, m_font);
+    }
+}
+
+void Ui::pageSample(const UiState& s, uint16_t* fb) {
+    Canvas565 c{fb, kDisplayW, kDisplayH};
+    if (s.sampleMsg) {
+        text(fb, 8, 24, 2, s.sampleMsg, kColDim);
+        return;
+    }
+    if (s.sampleState == 1) {
+        // REC marker + elapsed + level bar
+        fill(fb, 8, 20, 8, 8, kColWhite); // record dot
+        char tb[16];
+        std::snprintf(tb, sizeof(tb), "REC %.1f", double(s.sampleElapsed));
+        text(fb, 20, 21, 2, tb, kColWhite);
+        frame(fb, 112, 24, 120, 8, kColDim);
+        fill(fb, 113, 25, int(118 * s.sampleLevel), 6, kColWhite);
+        if (s.sampleWave && s.sampleWaveLen > 0) {
+            WaveformWidget w{8, 48, 224, 48, s.sampleWave, s.sampleWaveLen,
+                             -1};
+            w.draw(c);
+        }
+        text(fb, 8, 104, 1, "S2 STOP", kColDim);
+    } else if (s.sampleState == 2) {
+        SliceWidget sl{8, 40, 224, 48, s.sampleWave, s.sampleWaveLen,
+                       s.sampleTrim0, s.sampleTrim1, 1, -1};
+        sl.draw(c);
+        char tb[24];
+        std::snprintf(tb, sizeof(tb), "GAIN %.2f", double(s.sampleGain));
+        text(fb, 8, 24, 2, tb, kColWhite);
+        text(fb, 8, 96, 1, "E1 TRIM-  E2 TRIM+  E3 GAIN", kColDim);
+        text(fb, 8, 104, 1, "S3 NORM   S4 ASSIGN", kColDim);
+    } else {
+        text(fb, 8, 24, 2, "READY", kColGray);
+        text(fb, 8, 48, 1, "S1 = RECORD (MIC IN)", kColDim);
+    }
+}
+
+void Ui::pageLoad(const UiState& s, uint16_t* fb) {
+    Canvas565 c{fb, kDisplayW, kDisplayH};
+    FileBrowserWidget b = s.browser;
+    b.x = 8; b.y = 24; b.w = 224; b.h = 112;
+    b.draw(c, m_font);
+}
+
+void Ui::pageSettings(const UiState& s, uint16_t* fb) {
+    static const char* kNames[3] = {"THEME", "VEL SRC", "LED DIM"};
+    for (int i = 0; i < 3; ++i) {
+        const int y0 = 32 + i * 16;
+        const bool sel = (i == s.settingsSel);
+        if (sel) fill(fb, 0, y0, kDisplayW, 16, kColWhite);
+        text(fb, 8, y0 + 1, 2, kNames[i], sel ? kColBlack : kColGray);
+        if (s.settingsVal[i]) {
+            const int tw = textWidth(s.settingsVal[i], 2);
+            text(fb, kDisplayW - tw - 8, y0 + 1, 2, s.settingsVal[i],
+                 sel ? kColBlack : kColWhite, sel, kColWhite);
+        }
+    }
+    text(fb, 8, 96, 1, "E1 SEL  E2 ADJ  S2 SAVE", kColDim);
 }
 
 void Ui::pageSeq(const UiState& s, uint16_t* fb) {
@@ -202,6 +292,10 @@ void Ui::render(const UiState& s, uint16_t* fb) {
     switch (s.page) {
     case 1:  pageSeq(s, fb);   break;
     case 2:  pageMixer(s, fb); break;
+    case 3:  pageFx(s, fb);    break;
+    case 4:  pageSample(s, fb); break;
+    case 5:  pageLoad(s, fb);  break;
+    case 6:  pageSettings(s, fb); break;
     default: pageSynth(s, fb); break;
     }
     drawLeds(s, fb);
@@ -211,6 +305,13 @@ void Ui::render(const UiState& s, uint16_t* fb) {
         Canvas565 c{fb, kDisplayW, kDisplayH};
         ToastWidget toast{72, 48, 96, 32, s.toastLabel, s.toastValue};
         toast.draw(c, m_font);
+    }
+    // confirm dialog reads over everything, including toasts
+    if (s.dialogActive) {
+        Canvas565 c{fb, kDisplayW, kDisplayH};
+        DialogWidget dlg{56, 48, 128, 64, s.dlgTitle, s.dlgLine, nullptr,
+                         {"OK", "CANCEL", nullptr, nullptr}};
+        dlg.draw(c, m_font);
     }
 }
 

@@ -31,6 +31,8 @@
 #include "widgetshowcase.h"
 #include "pattern.h"
 #include "PanelView.h"
+#include "capture.h"
+#include "sampleio.h"
 
 #include "stb_image_write.h" // implementation TU: fontchart.cpp
 #include <SDL3/SDL.h>        // --panelprobe injects synthetic mouse events
@@ -42,10 +44,25 @@
 #include "instruments/DrumRack.h"
 #include "instruments/SubtractiveSynth.h"
 
+#include <nlohmann/json.hpp>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <dbghelp.h>
+#pragma comment(lib, "dbghelp.lib")
+#endif
+
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <thread>
 #include <variant>
@@ -137,7 +154,9 @@ public:
                     : testMode == 2 ? " (sequencer test)"
                     : testMode == 3 ? " (UI interaction test)"
                     : testMode == 4 ? " (long-pattern test)"
-                    : testMode == 5 ? " (panel mouse probe)" : "");
+                    : testMode == 5 ? " (panel mouse probe)"
+                    : testMode == 6 ? " (parameter/FX test)"
+                    : testMode == 7 ? " (sample/settings test)" : "");
 
         if (!m_hal.init(*this)) return 1;
 
@@ -169,8 +188,30 @@ public:
                 m_engine->instrument(1)))
             loadDefaultDrums(rack, m_engine->sampleRate());
 
-        // Push initial pot values into the synth params.
-        for (int i = 0; i < 6; ++i) applyParam(i);
+        // Bind pot/encoder params by name and sync the panel to the
+        // engine: pots start engaged at the panel's default positions
+        // (real panels adopt physical state at boot; pickup re-arms on
+        // track/page changes only).
+        rebindParams();
+        for (int i = 0; i < 6; ++i) {
+            if (m_potParam[i] >= 0) {
+                setNormParam(m_potParam[i], m_state.params[i].value / 127.0f);
+                m_potEngaged[i] = true;
+                m_potPrev[i] = m_state.params[i].value / 127.0f;
+            }
+        }
+
+        // FX chooser list: descriptor display names + "NONE".
+        for (const auto& d : yawn::audioEffectDescriptors())
+            m_fxItems.push_back(d.displayName);
+        m_fxItems.push_back("NONE");
+        m_state.chooserItems = m_fxItems.data();
+        m_state.chooserCount = int(m_fxItems.size());
+
+        // settings + browser (persisted settings load interactive-only)
+        if (testMode == 0) loadSettings();
+        syncSettingsUi();
+        refreshBrowser();
 
         // Static widget geometry (SEQ page: 4 tracks x 16 steps + lane).
         m_state.seq.x = 24; m_state.seq.y = 32;
@@ -229,6 +270,8 @@ public:
             m_state.clockPhase = float(safeBeats - std::floor(safeBeats));
 
             syncPatternToUi();
+            syncParamsToUi();
+            pollSample();
             if (m_state.toastActive &&
                 std::chrono::steady_clock::now() >= m_toastUntil)
                 m_state.toastActive = false;
@@ -269,11 +312,17 @@ public:
         if (m_testMode == 3) return uitestVerdict();
         if (m_testMode == 4) return longtestVerdict();
         if (m_testMode == 5) return probeVerdict();
+        if (m_testMode == 6) return paramtestVerdict();
+        if (m_testMode == 7) return sampletestVerdict();
         return 0;
     }
 
     // ── HalHandler ──────────────────────────────────────────────────
-    void onQuit() override { m_running = false; }
+    void onQuit() override {
+        if (m_testMode) { m_running = false; return; }
+        if (m_confirmAction == 0) openConfirm(2); // ESC asks first
+        else closeConfirm();                      // ESC again = cancel
+    }
 
     void onThemeNext() override { // F12 in the sim
         gb::setTheme(gb::ThemeId((gb::currentTheme() + 1) % gb::kNumThemes));
@@ -281,10 +330,43 @@ public:
         std::printf("[ui] theme -> %s\n", gb::themeName(gb::currentTheme()));
     }
 
+    // Encoder push = reset that param to its default (SYNTH: bound
+    // instrument param; FX: effect param).
+    void onEncoderPush(int index, bool pressed) override {
+        if (!pressed || index < 0 || index > 3 || m_state.chooserOpen)
+            return;
+        if (m_state.page == 0) {
+            const int p = m_encParam[index];
+            auto* inst = selInstrument();
+            if (inst && p >= 0) {
+                const auto& pi = inst->parameterInfo(p);
+                inst->setParameter(p, pi.defaultValue);
+                toast("RESET", pi.name);
+                std::printf("[panel] %s -> default\n", pi.name);
+            }
+        } else if (m_state.page == 3) {
+            if (auto* fx = fxOnSelectedTrack()) {
+                if (index < fx->parameterCount()) {
+                    const auto& pi = fx->parameterInfo(index);
+                    fx->setParameter(index, pi.defaultValue);
+                    toast("RESET", pi.name);
+                    std::printf("[fx] %s -> default\n", pi.name);
+                }
+            }
+        }
+    }
+
     void onKey(int index, bool pressed) override {
         using namespace gb;
         // boot splash: any key skips
         if (pressed && m_splash) { m_splash = false; return; }
+        // confirm dialog is modal: S1 = OK, S2 = CANCEL, rest swallowed
+        if (m_confirmAction != 0) {
+            if (!pressed) return;
+            if (index == kKeySoft1) doConfirm();
+            else if (index == kKeySoft2) closeConfirm();
+            return;
+        }
         if (index == kKeyShiftL || index == kKeyShiftR) {
             if (index == kKeyShiftL) m_shiftL = pressed;
             else                     m_shiftR = pressed;
@@ -370,14 +452,17 @@ public:
             if (index == 0) adjustLength(delta);
             return;
         }
-        switch (m_state.page) {
-        case 0: { // SYNTH: CUT/RES/ATK/REL
-            auto& p = m_state.params[index];
-            p.value = std::max(0, std::min(127, p.value + delta * 2));
-            std::printf("[panel] ENC%d %s = %d\n", index + 1, p.name, p.value);
-            applyParam(index);
-            break;
+        // FX chooser: encoder 1 scrolls the list.
+        if (m_state.chooserOpen) {
+            if (index == 0) fxChooserScroll(delta);
+            return;
         }
+        switch (m_state.page) {
+        case 0: // SYNTH: encoders edit the current param page's params
+            editBoundParam(m_encParam[index],
+                           shiftHeld() ? delta / 128.0f : delta / 16.0f,
+                           /*isEncoder=*/true);
+            break;
         case 1:   // SEQ: NTE/GTE/BPM (held steps were handled above)
             if (index == 0) {
                 const int n = std::max(24, std::min(84,
@@ -404,17 +489,55 @@ public:
                         double(m_vol[index]));
             break;
         }
+        case 3: { // FX: encoders edit the first 4 effect params
+            auto* fx = fxOnSelectedTrack();
+            if (fx && index < fx->parameterCount())
+                editFxParam(fx, index,
+                            shiftHeld() ? delta / 128.0f : delta / 16.0f);
+            break;
+        }
+        case 4:   // SAMPLE: trim start/end, gain (review state only)
+            if (m_sampleState == 2 && m_takeLen > 0) {
+                if (index == 0) {
+                    m_trim0 = std::max(0.0f, std::min(m_trim1 - 0.01f,
+                        m_trim0 + delta * 0.01f));
+                    std::printf("[sample] trim start %.2f\n", double(m_trim0));
+                } else if (index == 1) {
+                    m_trim1 = std::max(m_trim0 + 0.01f, std::min(1.0f,
+                        m_trim1 + delta * 0.01f));
+                    std::printf("[sample] trim end %.2f\n", double(m_trim1));
+                } else if (index == 2) {
+                    m_gain = std::max(0.1f, std::min(4.0f,
+                        m_gain + delta * 0.05f));
+                    std::printf("[sample] gain %.2f\n", double(m_gain));
+                }
+            }
+            break;
+        case 5:   // LOAD: encoder 1 scrolls the browser
+            if (index == 0) {
+                auto& b = m_state.browser;
+                b.selected = std::max(0, std::min(b.count - 1,
+                                                  b.selected + delta));
+                const int rows = (112 - 10) / 8;
+                if (b.selected < b.scroll) b.scroll = b.selected;
+                if (b.selected >= b.scroll + rows)
+                    b.scroll = b.selected - rows + 1;
+            }
+            break;
+        case 6:   // SET: enc1 = row, enc2 = adjust
+            if (index == 0) {
+                m_state.settingsSel = (m_state.settingsSel + delta + 3) % 3;
+            } else if (index == 1) {
+                settingsAdjust(delta);
+            }
+            break;
         }
     }
 
     void onAnalog(int index, float value) override {
         using namespace gb;
         if (index >= kAnalogPot0 && index < kAnalogPot0 + 6) {
-            const int i = index - kAnalogPot0;
-            m_state.params[i].value = int(value * 127.0f + 0.5f);
-            std::printf("[panel] POT%d %s = %d\n", i + 1,
-                        m_state.params[i].name, m_state.params[i].value);
-            applyParam(i);
+            potMove(index - kAnalogPot0, value);
         } else if (index == kAnalogSlider) {
             m_slider = value;
             std::printf("[panel] SLIDER velocity = %d\n", velocity7());
@@ -454,18 +577,29 @@ private:
         const char* enc[4];
         const char* soft[4];
     };
-    // Page indices into UiState::page. SAMPLE/SETTINGS slot in here.
-    static constexpr int kNumPages = 3;
+    // Page indices into UiState::page.
+    static constexpr int kNumPages = 7;
     inline static const PageDef kPages[kNumPages] = {
-        {"SYNTH", {"CUT", "RES", "ATK", "REL"},
-                  {"OCT-", "OCT+", "TRK-", "TRK+"}},
+        // SYNTH/FX encoder labels are dynamic (bound param names).
+        {"SYNTH", {"", "", "", ""},
+                  {"OCT-", "PG+", "TRK-", "TRK+"}},
         {"SEQ",   {"NTE", "GTE", "BPM", ""},
                   {"LEN", "4FLR", "TRK-", "TRK+"}},
         {"MIXER", {"LV1", "LV2", "LV3", "LV4"},
                   {"MUTE", "-", "TRK-", "TRK+"}},
+        {"FX",    {"", "", "", ""},
+                  {"LOAD", "BYP", "TRK-", "TRK+"}},
+        {"SAMPLE", {"TRIM-", "TRIM+", "GAIN", ""},
+                  {"REC", "STOP", "NORM", "ASSIGN"}},
+        {"LOAD",  {"SEL", "", "", ""},
+                  {"OPEN", "UP", "TRK-", "TRK+"}},
+        {"SET",   {"SEL", "ADJ", "", ""},
+                  {"ADJ", "SAVE", "TRK-", "TRK+"}},
     };
 
     void setPage(int p) {
+        if (p != m_state.page)          // real page change re-arms
+            for (int i = 0; i < 6; ++i) m_potEngaged[i] = false;
         m_state.page = p;
         for (int i = 0; i < 4; ++i) {
             m_state.encLabels[i] = kPages[p].enc[i];
@@ -475,19 +609,23 @@ private:
     }
 
     void softKey(int i) {
-        if (i == 2) { trackCycle(-1); return; } // S3 = TRK- on all pages
-        if (i == 3) { trackCycle(+1); return; } // S4 = TRK+ on all pages
+        // S3/S4 = TRK-/TRK+ on all pages EXCEPT SAMPLE (S3=NORM,
+        // S4=ASSIGN there — no TRK on that page).
+        if (i == 2 && m_state.page != 4) { trackCycle(-1); return; }
+        if (i == 3 && m_state.page != 4) { trackCycle(+1); return; }
         switch (m_state.page) {
-        case 0: // SYNTH
-            if (i == 0)      setOctave(-1);
-            else if (i == 1) setOctave(+1);
+        case 0: // SYNTH: S1 = OCT- (shift+S1 = OCT+), S2 = param page
+            if (i == 0) {
+                if (shiftHeld()) setOctave(+1);
+                else             setOctave(-1);
+            } else if (i == 1) {
+                nextEncPage(+1); // cycles non-empty pages only
+            }
             break;
         case 1: // SEQ: S1 = LEN (shift+S1 = CLR), S2 = 4FLR
             if (i == 0) {
                 if (shiftHeld()) {
-                    m_pattern.clearTrack(m_state.track);
-                    std::printf("[seq] T%d pattern cleared\n",
-                                m_state.track + 1);
+                    openConfirm(1); // clear track asks first
                 } else {
                     m_lenEdit = true;
                     char vb[8];
@@ -504,6 +642,24 @@ private:
             break;
         case 2: // MIXER: S1 = mute selected track
             if (i == 0) muteTrack(m_state.track);
+            break;
+        case 3: // FX: S1 = chooser open/confirm, S2 = cancel/bypass
+            if (i == 0)      fxChooserKey();
+            else if (i == 1) fxBypassKey();
+            break;
+        case 4: // SAMPLE: REC/STOP/NORM/ASSIGN
+            if (i == 0)      sampleRecToggle();
+            else if (i == 1) sampleStop();
+            else if (i == 2) sampleNormalize();
+            else if (i == 3) sampleAssign();
+            break;
+        case 5: // LOAD: S1 = enter/load, S2 = up
+            if (i == 0)      browserActivate();
+            else if (i == 1) browserUp();
+            break;
+        case 6: // SET: S1 = adjust, S2 = save
+            if (i == 0)      settingsAdjust(+1);
+            else if (i == 1) saveSettings();
             break;
         }
     }
@@ -604,10 +760,24 @@ private:
                        std::chrono::milliseconds(1200);
     }
 
+    // Low-priority toast (pot/encoder param feedback): suppressed
+    // while a hold-step pitch/gate edit owns the toast.
+    void toastLow(const char* label, const char* value) {
+        if (m_heldStep >= 0) return;
+        toast(label, value);
+    }
+
     // ── Tracks ──────────────────────────────────────────────────────
     void selectTrack(int t) {
         m_state.track = t;
         m_state.pageName = (t == 0) ? "SYNTH" : "DRUMS";
+        // DrumRack pad params (attack/decay etc.) target the selected
+        // pad — point it at this track's lane.
+        if (t > 0)
+            if (auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
+                    m_engine->instrument(1)))
+                rack->setSelectedPad(gb::Pattern::kPadNote[t]);
+        rebindParams(); // name-lookup bindings + pickup re-arm
         std::printf("[panel] track select -> T%d (%s)\n", t + 1,
                     t == 0 ? "SubtractiveSynth"
                     : t == 1 ? "DrumRack kick"
@@ -834,24 +1004,652 @@ private:
         }
     }
 
-    int velocity7() const {
-        return std::max(1, std::min(127, int(m_slider * 127.0f)));
+    // ── Parameter binding (name-lookup based, engine-change-proof) ──
+    static bool containsCI(const char* hay, const char* needle) {
+        auto lower = [](char c) {
+            return (c >= 'A' && c <= 'Z') ? char(c - 'A' + 'a') : c;
+        };
+        for (const char* h = hay; *h; ++h) {
+            const char* n = needle;
+            while (*n && h[n - needle] && lower(h[n - needle]) == lower(*n))
+                ++n;
+            if (!*n) return true;
+        }
+        return false;
     }
 
-    // Map UI params to the SubtractiveSynth on track 0.
-    void applyParam(int i) {
-        auto* inst = m_engine->instrument(0);
-        if (!inst) return;
-        using P = yawn::instruments::SubtractiveSynth;
-        const float v = m_state.params[i].value / 127.0f;
-        switch (i) {
-        case 0: inst->setParameter(P::kFilterCutoff, v); break;
-        case 1: inst->setParameter(P::kFilterResonance, v); break;
-        case 2: inst->setParameter(P::kAmpAttack, 0.001f + v * 2.0f); break;
-        case 3: inst->setParameter(P::kAmpDecay, 0.001f + v * 2.0f); break;
-        case 4: inst->setParameter(P::kAmpSustain, v); break;
-        case 5: inst->setParameter(P::kAmpRelease, 0.001f + v * 2.0f); break;
+    yawn::instruments::Instrument* selInstrument() {
+        return m_engine->instrument(gb::Pattern::engineTrack(m_state.track));
+    }
+
+    // Find a param index on the selected track's instrument by
+    // case-insensitive name substring ("" = match nothing). -1 = unbound.
+    int findParam(const char* nameSub) {
+        auto* inst = selInstrument();
+        if (!inst || !nameSub || !*nameSub) return -1;
+        for (int i = 0; i < inst->parameterCount(); ++i)
+            if (containsCI(inst->parameterInfo(i).name, nameSub)) return i;
+        return -1;
+    }
+
+    // Normalized 0..1 access via the selected track's ParameterInfo.
+    float getNormParam(int pidx) {
+        auto* inst = selInstrument();
+        if (!inst || pidx < 0) return 0.0f;
+        const auto& pi = inst->parameterInfo(pidx);
+        const float range = pi.maxValue - pi.minValue;
+        if (range == 0.0f) return 0.0f;
+        return std::max(0.0f, std::min(1.0f,
+            (inst->getParameter(pidx) - pi.minValue) / range));
+    }
+
+    void setNormParam(int pidx, float v) {
+        auto* inst = selInstrument();
+        if (!inst || pidx < 0) return;
+        const auto& pi = inst->parameterInfo(pidx);
+        v = std::max(0.0f, std::min(1.0f, v));
+        inst->setParameter(pidx, pi.minValue + v * (pi.maxValue - pi.minValue));
+    }
+
+    static void formatParam(const yawn::ParameterInfo& pi, float norm,
+                            char* buf, int n) {
+        const float v = pi.minValue + norm * (pi.maxValue - pi.minValue);
+        if (pi.formatFn) { pi.formatFn(v, buf, n); return; }
+        if (pi.isBoolean) {
+            std::snprintf(buf, n, "%s", norm >= 0.5f ? "ON" : "OFF");
+            return;
         }
+        if (pi.valueLabels && pi.valueLabelCount > 0) {
+            const int li = std::max(0, std::min(pi.valueLabelCount - 1,
+                int(norm * pi.valueLabelCount)));
+            std::snprintf(buf, n, "%s", pi.valueLabels[li]);
+            return;
+        }
+        std::snprintf(buf, n, "%.3g%s", double(v), pi.unit);
+    }
+
+    // Pots (CUT RES A D S R) bind by name on the selected track.
+    static constexpr const char* kPotNames[6] =
+        {"cutoff", "reso", "attack", "decay", "sustain", "release"};
+    static constexpr const char* kPotLabel[6] =
+        {"CUT", "RES", "A", "D", "S", "R"};
+
+    // ── Encoder param pages (built dynamically, pot-owned excluded) ──
+    // Design rule: each parameter belongs to exactly ONE control. The
+    // 6 pots own filter cutoff/resonance + amp A/D/S/R (and Pad
+    // Attack/Decay on drum tracks); encoder pages are built from the
+    // instrument's parameterInfo MINUS those names, partitioned:
+    //   OSC  — osc/wave/sub level params
+    //   MOD  — lfo/env/noise/filter type params
+    //   MISC — everything else not mapped elsewhere
+    // Pages with <4 params show "---" slots; empty pages are skipped
+    // when cycling (S2 = PG+).
+    struct EncPage { int count = 0; int param[4] = {-1, -1, -1, -1}; };
+    static constexpr const char* kEncPageTitles[3] = {"OSC", "MOD", "MISC"};
+
+    static bool nameHasAny(const char* name, const char* const* kws,
+                           int n) {
+        for (int i = 0; i < n; ++i)
+            if (containsCI(name, kws[i])) return true;
+        return false;
+    }
+    // Pot ownership is INDEX-precise (the params the pots are actually
+    // bound to), not a loose name match — "Filt Attack" is NOT the
+    // amp-A pot's "Amp Attack".
+    bool isPotOwnedIndex(int pidx) const {
+        for (int i = 0; i < 6; ++i)
+            if (m_potParam[i] == pidx) return true;
+        return false;
+    }
+
+    void rebindEncoders() {
+        static const char* kOscKw[] = {"osc", "wave", "sub level"};
+        static const char* kModKw[] = {"lfo", "env", "noise", "filter type"};
+        for (auto& pg : m_encPages) pg = EncPage{};
+        if (auto* inst = selInstrument()) {
+            const int n = inst->parameterCount();
+            auto claim = [&](int section, int pidx) {
+                if (m_encPages[section].count < 4)
+                    m_encPages[section].param[m_encPages[section].count++] =
+                        pidx;
+            };
+            for (int i = 0; i < n; ++i) {
+                const char* nm = inst->parameterInfo(i).name;
+                if (!isPotOwnedIndex(i) && nameHasAny(nm, kOscKw, 3))
+                    claim(0, i);
+            }
+            for (int i = 0; i < n; ++i) {
+                const char* nm = inst->parameterInfo(i).name;
+                if (!isPotOwnedIndex(i) && !nameHasAny(nm, kOscKw, 3) &&
+                    nameHasAny(nm, kModKw, 4))
+                    claim(1, i);
+            }
+            for (int i = 0; i < n; ++i) {
+                const char* nm = inst->parameterInfo(i).name;
+                if (!isPotOwnedIndex(i) && !nameHasAny(nm, kOscKw, 3) &&
+                    !nameHasAny(nm, kModKw, 4))
+                    claim(2, i);
+            }
+        }
+        if (m_encPages[m_paramPage].count == 0) nextEncPage(+1);
+        else applyEncPage();
+    }
+
+    void applyEncPage() {
+        for (int i = 0; i < 4; ++i)
+            m_encParam[i] = i < m_encPages[m_paramPage].count
+                                ? m_encPages[m_paramPage].param[i] : -1;
+    }
+
+    void nextEncPage(int dir) {
+        for (int tries = 0; tries < 3; ++tries) {
+            m_paramPage = (m_paramPage + dir + 3) % 3;
+            if (m_encPages[m_paramPage].count > 0) break;
+        }
+        applyEncPage();
+        std::printf("[panel] param page -> %s\n", kEncPageTitles[m_paramPage]);
+    }
+
+    void rebindParams() {
+        for (int i = 0; i < 6; ++i) m_potParam[i] = findParam(kPotNames[i]);
+        for (int i = 0; i < 6; ++i) m_potEngaged[i] = false;
+        rebindEncoders();
+    }
+
+    // Pot move with soft pickup: disengaged pots only watch until the
+    // physical position crosses the stored value; then they engage and
+    // the param follows.
+    void potMove(int pot, float value) {
+        const int p = m_potParam[pot];
+        if (p < 0) { // unbound (e.g. drum tracks: CUT/RES/S/R)
+            m_potPrev[pot] = value;
+            return;
+        }
+        const float cur = getNormParam(p);
+        if (!m_potEngaged[pot]) {
+            const float prev = m_potPrev[pot];
+            const float eps = 0.02f;
+            const bool crossed = (prev < cur - eps && value >= cur - eps) ||
+                                 (prev > cur + eps && value <= cur + eps) ||
+                                 std::fabs(value - cur) < eps;
+            if (!crossed) {
+                char vb[16];
+                std::snprintf(vb, sizeof(vb), "%d|%d",
+                              int(cur * 127 + 0.5f), int(value * 127 + 0.5f));
+                toastLow(kPotLabel[pot], vb);
+                std::printf("[panel] POT%d %s pickup: target=%d pot=%d\n",
+                            pot + 1, kPotLabel[pot], int(cur * 127 + 0.5f),
+                            int(value * 127 + 0.5f));
+                m_potPrev[pot] = value;
+                return;
+            }
+            m_potEngaged[pot] = true;
+            std::printf("[panel] POT%d %s engaged\n", pot + 1,
+                        kPotLabel[pot]);
+        }
+        m_potPrev[pot] = value;
+        setNormParam(p, value);
+        auto* inst = selInstrument();
+        char vb[16];
+        formatParam(inst->parameterInfo(p), value, vb, sizeof(vb));
+        toastLow(kPotLabel[pot], vb);
+        std::printf("[panel] POT%d %s = %s\n", pot + 1, kPotLabel[pot], vb);
+    }
+
+    // Encoder edit of a bound instrument param (step in normalized
+    // units; coarse 1/16, fine 1/128 via shift).
+    void editBoundParam(int pidx, float step, bool isEncoder) {
+        (void)isEncoder;
+        if (pidx < 0) return;
+        const float nv = std::max(0.0f, std::min(1.0f,
+            getNormParam(pidx) + step));
+        setNormParam(pidx, nv);
+        auto* inst = selInstrument();
+        const auto& pi = inst->parameterInfo(pidx);
+        char vb[16];
+        formatParam(pi, nv, vb, sizeof(vb));
+        toastLow(pi.name, vb);
+        std::printf("[panel] ENC %s = %s\n", pi.name, vb);
+    }
+
+    // ── FX (one insert slot per engine track) ───────────────────────
+    yawn::effects::AudioEffect* fxOnSelectedTrack() {
+        return m_engine->mixer()
+            .trackEffects(gb::Pattern::engineTrack(m_state.track))
+            .effectAt(0);
+    }
+
+    void editFxParam(yawn::effects::AudioEffect* fx, int pidx,
+                     float step) {
+        const auto& pi = fx->parameterInfo(pidx);
+        const float range = pi.maxValue - pi.minValue;
+        float norm = range > 0.0f
+            ? (fx->getParameter(pidx) - pi.minValue) / range : 0.0f;
+        norm = std::max(0.0f, std::min(1.0f, norm + step));
+        fx->setParameter(pidx, pi.minValue + norm * range);
+        char vb[16];
+        formatParam(pi, norm, vb, sizeof(vb));
+        toastLow(pi.name, vb);
+        std::printf("[panel] FX %s = %s\n", pi.name, vb);
+    }
+
+    void fxChooserKey() {
+        auto& ch = m_state;
+        if (!ch.chooserOpen) {
+            ch.chooserOpen = true;
+            ch.chooserSel = 0;
+            ch.chooserScroll = 0;
+            std::printf("[fx] chooser open (%d effects + NONE)\n",
+                        int(yawn::audioEffectDescriptors().size()));
+            return;
+        }
+        // confirm
+        const auto& descs = yawn::audioEffectDescriptors();
+        auto& chain = m_engine->mixer()
+            .trackEffects(gb::Pattern::engineTrack(m_state.track));
+        if (ch.chooserSel >= int(descs.size())) { // "NONE" entry
+            if (chain.effectAt(0)) {
+                chain.removeRetired(0);
+                std::printf("[fx] T%d effect removed\n", m_state.track + 1);
+            }
+        } else {
+            auto fx = yawn::createAudioEffect(descs[ch.chooserSel].id);
+            if (fx) {
+                chain.insert(0, std::move(fx));
+                std::printf("[fx] T%d <- %s\n", m_state.track + 1,
+                            descs[ch.chooserSel].displayName);
+                toast("FX", descs[ch.chooserSel].displayName);
+            }
+        }
+        ch.chooserOpen = false;
+    }
+
+    void fxChooserScroll(int delta) {
+        auto& ch = m_state;
+        const int count = int(yawn::audioEffectDescriptors().size()) + 1;
+        ch.chooserSel = (ch.chooserSel + delta + count) % count;
+        // keep selection visible in the 11-row list
+        const int rows = 11;
+        if (ch.chooserSel < ch.chooserScroll)
+            ch.chooserScroll = ch.chooserSel;
+        if (ch.chooserSel >= ch.chooserScroll + rows)
+            ch.chooserScroll = ch.chooserSel - rows + 1;
+    }
+
+    void fxBypassKey() {
+        if (m_state.chooserOpen) { // cancel
+            m_state.chooserOpen = false;
+            std::printf("[fx] chooser cancelled\n");
+            return;
+        }
+        if (auto* fx = fxOnSelectedTrack()) {
+            fx->setBypassed(!fx->bypassed());
+            std::printf("[fx] T%d %s %s\n", m_state.track + 1, fx->name(),
+                        fx->bypassed() ? "BYPASSED" : "active");
+        }
+    }
+
+    // ── SAMPLE page ─────────────────────────────────────────────────
+    static constexpr int kTakeFrames = 48000 * 10; // 10 s @ 48 kHz mono
+
+    void sampleRecToggle() {
+        if (m_sampleState == 1) { sampleStop(); return; }
+        if (m_testMode == 0 &&
+            yawn::audio::AudioEngine::defaultInputDevice() < 0) {
+            m_state.sampleMsg = "NO INPUT";
+            std::printf("[sample] NO INPUT (no default capture device)\n");
+            return;
+        }
+        m_state.sampleMsg = nullptr;
+        m_capture = (m_testMode != 0)
+            ? std::unique_ptr<gb::CaptureSource>(new gb::SineCaptureSource())
+            : std::unique_ptr<gb::CaptureSource>(
+                  new gb::EngineCaptureSource(*m_engine));
+        if (!m_capture->start(kTakeFrames)) {
+            m_state.sampleMsg = "NO INPUT";
+            m_capture.reset();
+            std::printf("[sample] capture start FAILED\n");
+            return;
+        }
+        m_sampleState = 1;
+        std::printf("[sample] REC start\n");
+    }
+
+    void sampleStop() {
+        if (m_sampleState != 1 || !m_capture) return;
+        m_capture->stop();
+        const int n = m_capture->framesWritten();
+        m_take.assign(m_capture->data(), m_capture->data() + n);
+        m_takeLen = n;
+        m_capture.reset();
+        m_sampleState = 2;
+        // repoint the UI immediately — its state-1 waveform pointer was
+        // into the just-destroyed capture buffer
+        m_state.sampleState = 2;
+        m_state.sampleWave = m_takeLen > 0 ? m_take.data() : nullptr;
+        m_state.sampleWaveLen = m_takeLen;
+        m_state.sampleLevel = 0.0f;
+        m_trim0 = 0.0f; m_trim1 = 1.0f; m_gain = 1.0f;
+        std::printf("[sample] REC stop: %d frames (%.1f s)\n", n,
+                    n / 48000.0);
+    }
+
+    void sampleNormalize() {
+        if (m_sampleState != 2 || m_takeLen == 0) return;
+        const int i0 = int(m_trim0 * (m_takeLen - 1));
+        const int i1 = int(m_trim1 * (m_takeLen - 1)) + 1;
+        float peak = 0.0f;
+        for (int i = i0; i < i1 && i < m_takeLen; ++i)
+            peak = std::max(peak, std::fabs(m_take[size_t(i)]));
+        if (peak > 0.001f) m_gain = std::min(4.0f, 0.95f / peak);
+        std::printf("[sample] normalize: peak %.3f gain %.2f\n",
+                    double(peak), double(m_gain));
+        toastLow("NORM", "done");
+    }
+
+    void sampleAssign() {
+        if (m_sampleState != 2 || m_takeLen == 0) return;
+        if (m_state.track == 0) {
+            toast("ASSIGN", "DRUMS ONLY");
+            std::printf("[sample] assign: select a drum track (T2-T4)\n");
+            return;
+        }
+        std::error_code ec;
+        std::filesystem::create_directories("samples", ec);
+        // auto-incremented takeNNN.wav
+        char name[64] = {};
+        int takeNum = 1;
+        for (; takeNum < 1000; ++takeNum) {
+            std::snprintf(name, sizeof(name), "samples/take%03d.wav",
+                          takeNum);
+            if (!std::filesystem::exists(name, ec)) break;
+        }
+        const int i0 = int(m_trim0 * (m_takeLen - 1));
+        const int i1 = std::min(m_takeLen, int(m_trim1 * (m_takeLen - 1)) + 1);
+        const int n = std::max(0, i1 - i0);
+        std::vector<float> buf;
+        buf.resize(size_t(n));
+        for (int i = 0; i < n; ++i)
+            buf[size_t(i)] = m_take[size_t(i0 + i)] * m_gain;
+        if (!gb::writeWavMono(name, buf.data(), n, 48000)) {
+            std::printf("[sample] WAV write FAILED: %s\n", name);
+            return;
+        }
+        // load into this track's pad (mono → stereo duplicate)
+        std::vector<float> st;
+        st.resize(size_t(n) * 2);
+        for (int i = 0; i < n; ++i)
+            st[size_t(i) * 2] = st[size_t(i) * 2 + 1] = buf[size_t(i)];
+        if (auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
+                m_engine->instrument(1)))
+            rack->loadPad(gb::Pattern::kPadNote[m_state.track], st.data(),
+                          n, 2);
+        m_assigned = true;
+        std::printf("[sample] assigned %s (%d frames) -> T%d pad %d\n",
+                    name, n, m_state.track + 1,
+                    gb::Pattern::kPadNote[m_state.track]);
+        char vb[16];
+        std::snprintf(vb, sizeof(vb), "take%03d", takeNum);
+        toast("SAVED", vb);
+        refreshBrowser();
+    }
+
+    void pollSample() { // per-frame: recording progress → UiState
+        m_state.sampleState = m_sampleState;
+        m_state.sampleGain = m_gain;
+        m_state.sampleTrim0 = m_trim0;
+        m_state.sampleTrim1 = m_trim1;
+        if (m_sampleState == 1 && m_capture) {
+            m_state.sampleLevel = std::min(1.0f, m_capture->recentPeak());
+            m_state.sampleElapsed = m_capture->framesWritten() / 48000.0f;
+            m_state.sampleWave = m_capture->data();
+            m_state.sampleWaveLen = m_capture->framesWritten();
+            if (m_capture->done()) sampleStop(); // buffer full
+        } else {
+            m_state.sampleLevel = 0.0f;
+            m_state.sampleWave = m_takeLen > 0 ? m_take.data() : nullptr;
+            m_state.sampleWaveLen = m_takeLen;
+        }
+    }
+
+    // ── LOAD page (file browser) ────────────────────────────────────
+    void refreshBrowser() {
+        if (!gb::dirExists(m_browserDir))
+            std::filesystem::create_directories(m_browserDir, m_fsEc);
+        std::vector<gb::DirEntry> de;
+        gb::listDir(m_browserDir, de);
+        m_browserNames.clear();
+        m_browserNames.push_back("..");
+        for (const auto& e : de) m_browserNames.push_back(e.name);
+        if (m_browserNames.size() > 256) m_browserNames.resize(256);
+        m_browserIsDir[0] = true;
+        for (size_t i = 1; i < m_browserNames.size(); ++i)
+            m_browserIsDir[i] = de[i - 1].isDir;
+        m_browserPtrs.assign(m_browserNames.size(), nullptr);
+        for (size_t i = 0; i < m_browserNames.size(); ++i)
+            m_browserPtrs[i] = m_browserNames[i].c_str();
+        auto& b = m_state.browser;
+        b.path = m_browserDir.c_str();
+        b.entries = m_browserPtrs.data();
+        b.isDir = m_browserIsDir;
+        b.count = int(m_browserPtrs.size());
+        b.selected = std::min(b.selected, b.count - 1);
+        b.scroll = 0;
+    }
+
+    void browserActivate() {
+        auto& b = m_state.browser;
+        if (b.selected < 0 || b.selected >= b.count) return;
+        const std::string& name = m_browserNames[size_t(b.selected)];
+        if (name == "..") { browserUp(); return; }
+        const std::string full = m_browserDir + "/" + name;
+        if (m_browserIsDir[size_t(b.selected)]) {
+            m_browserDir = full;
+            b.selected = 0;
+            refreshBrowser();
+            std::printf("[load] dir -> %s\n", m_browserDir.c_str());
+            return;
+        }
+        if (m_state.track == 0) {
+            toast("LOAD", "DRUMS ONLY");
+            return;
+        }
+        std::vector<float> data;
+        int sr = 0;
+        const int n = gb::readWavStereo(full.c_str(), data, sr);
+        if (n <= 0) {
+            std::printf("[load] read FAILED: %s\n", full.c_str());
+            toastLow("LOAD", "FAILED");
+            return;
+        }
+        if (auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
+                m_engine->instrument(1)))
+            rack->loadPad(gb::Pattern::kPadNote[m_state.track],
+                          data.data(), n, 2);
+        std::printf("[load] %s (%d frames @%d) -> T%d pad %d\n",
+                    full.c_str(), n, sr, m_state.track + 1,
+                    gb::Pattern::kPadNote[m_state.track]);
+        toast("LOADED", name.c_str());
+        m_browserLoaded = true;
+    }
+
+    void browserUp() {
+        if (m_browserDir == "samples" || m_browserDir == "samples/") return;
+        const auto pos = m_browserDir.find_last_of('/');
+        m_browserDir = (pos == std::string::npos)
+                           ? "samples" : m_browserDir.substr(0, pos);
+        m_state.browser.selected = 0;
+        refreshBrowser();
+        std::printf("[load] dir -> %s\n", m_browserDir.c_str());
+    }
+
+    // ── SETTINGS page ───────────────────────────────────────────────
+    static const char* themeNameGb() {
+        return gb::themeName(gb::currentTheme());
+    }
+    const char* velSourceName() const {
+        return m_velSource == 1 ? "FIXED100" : m_velSource == 2 ? "HOST"
+                                                                : "SLIDER";
+    }
+
+    void settingsAdjust(int dir) {
+        switch (m_state.settingsSel) {
+        case 0: // THEME
+            gb::setTheme(gb::ThemeId(
+                (gb::currentTheme() + (dir > 0 ? 1 : gb::kNumThemes - 1)) %
+                gb::kNumThemes));
+            std::printf("[set] theme -> %s\n", themeNameGb());
+            break;
+        case 1: // VELOCITY SOURCE
+            m_velSource = (m_velSource + (dir > 0 ? 1 : 2)) % 3;
+            std::printf("[set] velocity source -> %s\n", velSourceName());
+            break;
+        case 2: // LED brightness (stub for the panel, no-op here)
+            m_ledBrightness = std::max(1, std::min(15,
+                m_ledBrightness + (dir > 0 ? 1 : -1)));
+            std::printf("[set] LED brightness -> %d (stub)\n",
+                        m_ledBrightness);
+            break;
+        }
+        syncSettingsUi();
+        saveSettings(); // save-on-change
+    }
+
+    void syncSettingsUi() {
+        m_state.settingsVal[0] = themeNameGb();
+        m_state.settingsVal[1] = velSourceName();
+        std::snprintf(m_ledValBuf, sizeof(m_ledValBuf), "%d",
+                      m_ledBrightness);
+        m_state.settingsVal[2] = m_ledValBuf;
+    }
+
+    void saveSettings() {
+        nlohmann::json j;
+        j["theme"] = themeNameGb();
+        j["velSource"] = velSourceName();
+        j["ledBrightness"] = m_ledBrightness;
+        if (FILE* f = std::fopen("settings.json", "wb")) {
+            const std::string s = j.dump(2);
+            std::fwrite(s.data(), 1, s.size(), f);
+            std::fclose(f);
+            std::printf("[set] saved settings.json\n");
+        }
+    }
+
+    void loadSettings() {
+        FILE* f = std::fopen("settings.json", "rb");
+        if (!f) return;
+        char buf[512];
+        const size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
+        std::fclose(f);
+        buf[n] = 0;
+        try {
+            auto j = nlohmann::json::parse(buf);
+            const std::string th = j.value("theme", "MONO");
+            gb::setTheme(th == "RED" ? gb::kThemeRed
+                         : th == "GREEN" ? gb::kThemeGreen
+                                         : gb::kThemeMono);
+            const std::string vs = j.value("velSource", "SLIDER");
+            m_velSource = vs == "FIXED100" ? 1 : vs == "HOST" ? 2 : 0;
+            m_ledBrightness = j.value("ledBrightness", 8);
+            std::printf("[set] loaded settings.json (theme=%s vel=%s)\n",
+                        th.c_str(), vs.c_str());
+        } catch (...) {
+            std::printf("[set] settings.json unreadable — defaults\n");
+        }
+    }
+
+    // ── Confirm dialog ──────────────────────────────────────────────
+    void openConfirm(int action) {
+        m_confirmAction = action;
+        m_state.dialogActive = true;
+        if (action == 1) {
+            m_state.dlgTitle = "CLEAR TRACK?";
+            m_state.dlgLine = "PATTERN GONE.";
+        } else {
+            m_state.dlgTitle = "QUIT?";
+            m_state.dlgLine = "UNSAVED STATE LOST.";
+        }
+        std::printf("[ui] confirm: %s\n", m_state.dlgTitle);
+    }
+
+    void closeConfirm() {
+        m_confirmAction = 0;
+        m_state.dialogActive = false;
+        std::printf("[ui] confirm cancelled\n");
+    }
+
+    void doConfirm() {
+        const int action = m_confirmAction;
+        closeConfirm();
+        if (action == 1) {
+            m_pattern.clearTrack(m_state.track);
+            std::printf("[seq] T%d pattern cleared\n", m_state.track + 1);
+        } else if (action == 2) {
+            m_running = false;
+        }
+    }
+
+    // ── Param/FX sync (engine → UI, every frame) ────────────────────
+    void syncParamsToUi() {
+        // pot rows: engine values; unbound (drums CUT/RES/S/R) → "—"
+        for (int i = 0; i < 6; ++i) {
+            m_state.params[i].name = kPotLabel[i];
+            m_state.params[i].value =
+                m_potParam[i] >= 0
+                    ? int(getNormParam(m_potParam[i]) * 127.0f + 0.5f)
+                    : -1;
+        }
+        // dynamic encoder labels
+        if (m_state.page == 0) {
+            auto* inst = selInstrument();
+            for (int i = 0; i < 4; ++i) {
+                if (inst && m_encParam[i] >= 0)
+                    std::snprintf(m_encLabelBuf[i], sizeof(m_encLabelBuf[i]),
+                                  "%.8s", inst->parameterInfo(m_encParam[i]).name);
+                else
+                    std::snprintf(m_encLabelBuf[i], sizeof(m_encLabelBuf[i]),
+                                  "---");
+                m_state.encLabels[i] = m_encLabelBuf[i];
+            }
+        } else if (m_state.page == 3) {
+            auto* fx = fxOnSelectedTrack();
+            for (int i = 0; i < 4; ++i) {
+                if (fx && i < fx->parameterCount())
+                    std::snprintf(m_encLabelBuf[i], sizeof(m_encLabelBuf[i]),
+                                  "%.8s", fx->parameterInfo(i).name);
+                else
+                    std::snprintf(m_encLabelBuf[i], sizeof(m_encLabelBuf[i]),
+                                  "---");
+                m_state.encLabels[i] = m_encLabelBuf[i];
+            }
+            m_state.fxName = fx ? fx->name() : nullptr;
+            m_state.fxBypassed = fx && fx->bypassed();
+            for (int i = 0; i < 4; ++i) {
+                if (fx && i < fx->parameterCount()) {
+                    const auto& pi = fx->parameterInfo(i);
+                    const float range = pi.maxValue - pi.minValue;
+                    m_state.fxParams[i].name = pi.name;
+                    m_state.fxParams[i].value =
+                        range > 0.0f
+                            ? int((fx->getParameter(i) - pi.minValue) /
+                                  range * 127.0f + 0.5f)
+                            : 0;
+                } else {
+                    m_state.fxParams[i].name = nullptr;
+                    m_state.fxParams[i].value = -1;
+                }
+            }
+        }
+    }
+
+    int velocity7() {
+        int v;
+        if (m_velSource == 1)      v = 100;         // fixed
+        else if (m_velSource == 2) v = m_hostVel;   // host register
+        else v = std::max(1, std::min(127, int(m_slider * 127.0f)));
+        m_hostVel = v; // host register tracks the last velocity used
+        return v;
     }
 
     // ── Test drivers ────────────────────────────────────────────────
@@ -866,7 +1664,9 @@ private:
         else if (m_testMode == 2) seqtestStep(t, once);
         else if (m_testMode == 3) uitestStep(t, once);
         else if (m_testMode == 4) longtestStep(t, once);
-        else                      probeStep(t, once);
+        else if (m_testMode == 5) probeStep(t, once);
+        else if (m_testMode == 6) paramtestStep(t, once);
+        else                      sampletestStep(t, once);
     }
 
     // --smoke: boot + notes on both engine tracks + frame per page.
@@ -1194,7 +1994,7 @@ private:
         }
     }
 
-    int probeVerdict() const {
+    int probeVerdict() {
         int pass = 0, fail = 0;
         auto check = [&](bool ok, const char* what) {
             std::printf("[probe] ASSERT %-46s %s\n", what,
@@ -1203,8 +2003,283 @@ private:
         };
         check(m_probeNotes == 1, "mouse click on white key 1 -> note event");
         check(m_state.params[1].value != 41, "RES pot drag -> analog delta");
-        check(m_state.params[2].value != 3, "wheel over ENC3 -> encoder delta");
+        // ENC3 on the OSC page = Osc2 Wave (norm default 0.25)
+        check(std::fabs(getNormParam(m_encParam[2]) - 0.25f) > 0.05f,
+              "wheel over ENC3 -> encoder delta");
         std::printf("[probe] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
+    // --paramtest: pot pickup, encoder edits/reset/fine, FX chooser,
+    // drum-track pot mapping — all through the HAL event path.
+    template <typename Once>
+    void paramtestStep(double t, Once& once) {
+        if (t >= 0.3 && once(0)) {
+            std::printf("[paramtest] select T1 (shift+white1) — pickup "
+                        "re-arms\n");
+            onKey(gb::kKeyShiftL, true);
+            onKey(0, true); onKey(0, false);
+            onKey(gb::kKeyShiftL, false);
+            // sweep CUT pot 0.0 -> 0.6 in small steps: param must NOT
+            // move (stored = 87/127 ≈ 0.685 from boot)
+            for (int i = 0; i <= 12; ++i) onAnalog(gb::kAnalogPot0, i * 0.05f);
+            const float norm = getNormParam(m_potParam[0]);
+            m_ptOk[0] = !m_potEngaged[0] && norm > 0.66f && norm < 0.71f;
+            std::printf("[paramtest] after sub-target sweep: engaged=%d "
+                        "norm=%.3f\n", int(m_potEngaged[0]), double(norm));
+        }
+        if (t >= 0.6 && once(1)) {
+            // cross the stored value -> engages, param follows
+            onAnalog(gb::kAnalogPot0, 0.70f);
+            onAnalog(gb::kAnalogPot0, 0.75f);
+            const float norm = getNormParam(m_potParam[0]);
+            m_ptOk[1] = m_potEngaged[0] && norm > 0.73f && norm < 0.77f;
+            std::printf("[paramtest] after crossing: engaged=%d norm=%.3f\n",
+                        int(m_potEngaged[0]), double(norm));
+        }
+        if (t >= 0.8 && once(2)) {
+            // encoder edit (coarse) then push-to-reset. ENC1 on the OSC
+            // page = Osc1 Wave (min 0 max 4 default 1 → norm 0.25).
+            onEncoderDelta(0, +1); // +1/16 = 0.0625
+            const float edited = getNormParam(m_encParam[0]);
+            m_ptOk[2] = edited > 0.29f && edited < 0.34f && m_toastShown;
+            onEncoderPush(0, true); onEncoderPush(0, false);
+            const float reset = getNormParam(m_encParam[0]);
+            m_ptOk[3] = reset > 0.23f && reset < 0.27f;
+            std::printf("[paramtest] enc edit %.3f -> reset %.3f\n",
+                        double(edited), double(reset));
+        }
+        if (t >= 1.0 && once(3)) {
+            // shift-fine adjust: step must be tiny (1/128)
+            const float before = getNormParam(m_encParam[0]);
+            onKey(gb::kKeyShiftL, true);
+            onEncoderDelta(0, +1);
+            onKey(gb::kKeyShiftL, false);
+            const float d = getNormParam(m_encParam[0]) - before;
+            m_ptOk[4] = d > 0.001f && d < 0.02f;
+            std::printf("[paramtest] shift-fine delta = %.4f\n", double(d));
+        }
+        if (t >= 1.2 && once(4)) softKey(1); // PG+ -> osc param page
+        if (t >= 1.3 && once(9)) dumpFrame("paramtest_p2.rgb565");
+        if (t >= 1.35 && once(10)) {
+            // Exclusion sweep: turn ALL encoders on ALL pages — no
+            // pot-owned parameter may change.
+            float before[6];
+            for (int i = 0; i < 6; ++i)
+                before[i] = m_potParam[i] >= 0 ? getNormParam(m_potParam[i])
+                                               : -1.0f;
+            for (int p = 0; p < 3; ++p) {
+                for (int e = 0; e < 4; ++e) onEncoderDelta(e, +2);
+                softKey(1);
+            }
+            bool same = true;
+            for (int i = 0; i < 6; ++i)
+                if (m_potParam[i] >= 0 &&
+                    std::fabs(getNormParam(m_potParam[i]) - before[i]) >
+                        1e-4f)
+                    same = false;
+            m_ptOk[8] = same;
+            m_ptOk[9] = m_encPages[0].count == 4 &&
+                        m_encPages[1].count == 4;
+            std::printf("[paramtest] encoder sweep: pot params %s; "
+                        "OSC=%d MOD=%d MISC=%d\n", same ? "untouched" : "MOVED",
+                        m_encPages[0].count, m_encPages[1].count,
+                        m_encPages[2].count);
+        }
+        if (t >= 1.4 && once(5)) {
+            std::printf("[paramtest] FX: select T2, page -> FX, chooser\n");
+            onKey(gb::kKeyShiftL, true);
+            onKey(1, true); onKey(1, false); // shift+white 2 = T2
+            onKey(gb::kKeyShiftL, false);
+            onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false); // 0->1
+            onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false); // 1->2
+            onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false); // 2->3
+            softKey(0); // open chooser
+            m_ptOk[5] = m_state.chooserOpen;
+            softKey(0); // confirm: Reverb (descriptor 0)
+            const auto* fx = fxOnSelectedTrack();
+            m_ptOk[5] = m_ptOk[5] && fx && containsCI(fx->name(), "reverb");
+            std::printf("[paramtest] fx on T2: %s\n",
+                        fx ? fx->name() : "(none)");
+        }
+        if (t >= 1.6 && once(6)) {
+            auto* fx = fxOnSelectedTrack();
+            const float before = fx ? fx->getParameter(0) : -1.0f;
+            onEncoderDelta(0, +2); // FX param 0 += 2/16
+            const float after = fx ? fx->getParameter(0) : -1.0f;
+            m_ptOk[6] = fx && after > before;
+            std::printf("[paramtest] fx param0 %.3f -> %.3f\n",
+                        double(before), double(after));
+            dumpFrame("paramtest_fx.rgb565");
+        }
+        if (t >= 1.8 && once(7)) {
+            // drum-track pots: A maps to Pad Attack — sweep the pot
+            // down through the target to engage pickup, then up
+            onAnalog(gb::kAnalogPot0 + 2, 0.9f);
+            onAnalog(gb::kAnalogPot0 + 2, 0.0f); // crosses target ~0
+            onAnalog(gb::kAnalogPot0 + 2, 0.5f); // engaged -> attack ~1s
+            auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
+                m_engine->instrument(1));
+            m_ptOk[7] = rack && rack->getParameter(5) > 0.01f;
+            onAnalog(gb::kAnalogPot0, 0.1f); // CUT: unbound, must not crash
+            std::printf("[paramtest] drum pad attack = %.3f\n",
+                        rack ? double(rack->getParameter(5)) : -1.0);
+            // re-arm a toast and dump it on the FX page
+            onEncoderDelta(0, +1);
+            dumpFrame("paramtest_toast.rgb565");
+        }
+        if (t >= 1.9 && once(11)) {
+            // DrumRack: OSC/MOD pages are empty — cycling must land on
+            // and stay on MISC (the only non-empty page).
+            setPage(0);
+            m_ptOk[10] = m_encPages[0].count == 0 &&
+                         m_encPages[1].count == 0 &&
+                         m_encPages[2].count == 4 && m_paramPage == 2;
+            softKey(1); // PG+ must stay on MISC
+            m_ptOk[10] = m_ptOk[10] && m_paramPage == 2;
+            std::printf("[paramtest] drum pages: OSC=%d MOD=%d MISC=%d "
+                        "current=%s\n", m_encPages[0].count,
+                        m_encPages[1].count, m_encPages[2].count,
+                        kEncPageTitles[m_paramPage]);
+        }
+        if (t >= 2.0 && once(8)) {
+            std::printf("[paramtest] done — asserting\n");
+            m_running = false;
+        }
+    }
+
+    int paramtestVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[paramtest] ASSERT %-46s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_ptOk[0], "pot pickup: no change below stored value");
+        check(m_ptOk[1], "pot pickup: engages on crossing, param follows");
+        check(m_ptOk[2], "encoder edit applies + toast shown");
+        check(m_ptOk[3], "encoder push resets to default");
+        check(m_ptOk[4], "shift+encoder = fine step (~1/128)");
+        check(m_ptOk[5], "FX chooser loads Reverb on T2");
+        check(m_ptOk[6], "encoder edits FX param 0");
+        check(m_ptOk[7], "drum track: A pot maps to Pad Attack");
+        check(m_ptOk[8], "encoders never touch pot-owned params");
+        check(m_ptOk[9], "SubSynth OSC+MOD pages have 4 params each");
+        check(m_ptOk[10], "drum: empty pages skipped (MISC only)");
+        std::printf("[paramtest] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
+    // --sampletest: record (generated take) → trim → assign → browser
+    // → settings round-trip → dialog — through the HAL event path.
+    template <typename Once>
+    void sampletestStep(double t, Once& once) {
+        if (t >= 0.3 && once(0)) {
+            std::printf("[sampletest] T2, page -> SAMPLE (4x >)\n");
+            onKey(gb::kKeyShiftL, true);
+            onKey(1, true); onKey(1, false); // shift+white 2 = T2
+            onKey(gb::kKeyShiftL, false);
+            for (int i = 0; i < 4; ++i) {
+                onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false);
+            }
+            softKey(0); // S1 = REC
+            m_stOk[0] = (m_sampleState == 1);
+        }
+        if (t >= 0.6 && once(1)) dumpFrame("sampletest_rec.rgb565");
+        if (t >= 1.2 && once(2)) {
+            softKey(1); // S2 = STOP
+            float peak = 0.0f;
+            for (int i = 0; i < m_takeLen; ++i)
+                peak = std::max(peak, std::fabs(m_take[size_t(i)]));
+            m_stOk[1] = (m_sampleState == 2) && m_takeLen > 20000 &&
+                        peak > 0.01f;
+            std::printf("[sampletest] take: %d frames, peak %.3f\n",
+                        m_takeLen, double(peak));
+        }
+        if (t >= 1.4 && once(3)) {
+            onEncoderDelta(0, +10); // trim start +0.10
+            onEncoderDelta(1, -10); // trim end -0.10
+            softKey(2);             // S3 = NORM
+            m_stOk[2] = m_gain > 1.0f;
+            std::printf("[sampletest] trim %.2f..%.2f gain %.2f\n",
+                        double(m_trim0), double(m_trim1), double(m_gain));
+        }
+        if (t >= 1.6 && once(4)) {
+            softKey(3); // S4 = ASSIGN
+            m_stOk[3] = m_assigned && gb::dirExists("samples");
+            std::printf("[sampletest] assigned=%d\n", int(m_assigned));
+        }
+        if (t >= 1.8 && once(5)) {
+            // audition: play the assigned pad, watch the T2 meter rise
+            playKey(0, true);
+        }
+        if (t >= 2.2 && once(6)) {
+            playKey(0, false);
+            m_stOk[4] = m_state.mixer.level[1] > 0.001f;
+            std::printf("[sampletest] T2 meter after audition: %.4f\n",
+                        double(m_state.mixer.level[1]));
+        }
+        if (t >= 2.4 && once(7)) {
+            // LOAD page: browser lists the take, S1 loads it
+            onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false);
+            refreshBrowser();
+            bool found = false;
+            for (const auto& n : m_browserNames)
+                if (n.size() > 4 && n.rfind(".wav") == n.size() - 4)
+                    found = true;
+            m_stOk[5] = found;
+            // select the first .wav entry and load it
+            auto& b = m_state.browser;
+            for (int i = 0; i < b.count; ++i)
+                if (!m_browserIsDir[size_t(i)]) { b.selected = i; break; }
+            browserActivate();
+            m_stOk[5] = m_stOk[5] && m_browserLoaded;
+            dumpFrame("sampletest_browser.rgb565");
+        }
+        if (t >= 2.6 && once(8)) {
+            // settings round-trip: set theme RED, reload from file
+            onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false);
+            m_state.settingsSel = 0;
+            settingsAdjust(+1); // -> RED + save-on-change
+            gb::setTheme(gb::kThemeMono); // simulate restart
+            loadSettings();
+            m_stOk[6] = (gb::currentTheme() == gb::kThemeRed);
+            dumpFrame("sampletest_settings.rgb565");
+        }
+        if (t >= 2.8 && once(9)) {
+            // confirm dialog on clear-track
+            setPage(1);
+            onKey(gb::kKeyShiftL, true);
+            softKey(0); // shift+S1 = CLR -> confirm
+            onKey(gb::kKeyShiftL, false);
+            m_stOk[7] = m_state.dialogActive && m_confirmAction == 1;
+            dumpFrame("sampletest_dialog.rgb565");
+            onKey(gb::kKeySoft2, true); onKey(gb::kKeySoft2, false); // CANCEL
+            m_stOk[7] = m_stOk[7] && m_confirmAction == 0 &&
+                        !m_state.dialogActive;
+        }
+        if (t >= 3.0 && once(10)) {
+            std::printf("[sampletest] done — asserting\n");
+            m_running = false;
+        }
+    }
+
+    int sampletestVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[sampletest] ASSERT %-46s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_stOk[0], "S1 starts recording (capture running)");
+        check(m_stOk[1], "stop finalizes take (>20k frames, level>0)");
+        check(m_stOk[2], "trim + normalize applies gain");
+        check(m_stOk[3], "assign writes WAV + loads pad");
+        check(m_stOk[4], "assigned pad is audible on trigger");
+        check(m_stOk[5], "browser lists + loads the take");
+        check(m_stOk[6], "settings persist across save/load");
+        check(m_stOk[7], "CLR confirm dialog opens + cancels");
+        std::printf("[sampletest] %d/%d assertions PASS\n", pass, pass + fail);
         return fail == 0 ? 0 : 1;
     }
 
@@ -1252,6 +2327,42 @@ private:
     float m_vol[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     bool m_recArmed = false;
 
+    // SAMPLE page
+    std::unique_ptr<gb::CaptureSource> m_capture;
+    std::vector<float> m_take;
+    int m_takeLen = 0;
+    int m_sampleState = 0; // 0 idle, 1 recording, 2 review
+    float m_trim0 = 0.0f, m_trim1 = 1.0f, m_gain = 1.0f;
+
+    // LOAD page
+    std::string m_browserDir = "samples";
+    std::vector<std::string> m_browserNames;
+    std::vector<const char*> m_browserPtrs;
+    bool m_browserIsDir[256] = {}; // vector<bool> has no .data()
+    std::error_code m_fsEc;
+
+    // SETTINGS
+    int m_velSource = 0;      // 0=slider 1=fixed100 2=host(last used)
+    int m_hostVel = 100;
+    int m_ledBrightness = 8;  // stub for the panel
+    char m_ledValBuf[8] = {};
+
+    // confirm dialog (0=none 1=clear track 2=quit)
+    int m_confirmAction = 0;
+
+    // sampletest assertions
+    bool m_assigned = false, m_browserLoaded = false;
+
+    // parameter bindings (M2b)
+    int m_potParam[6] = {-1, -1, -1, -1, -1, -1};
+    bool m_potEngaged[6] = {};
+    float m_potPrev[6] = {};
+    EncPage m_encPages[3];
+    int m_encParam[4] = {-1, -1, -1, -1};
+    int m_paramPage = 0;
+    char m_encLabelBuf[4][10] = {};
+    std::vector<const char*> m_fxItems; // chooser: descriptors + NONE
+
     // scheduler state
     struct LiveNote { bool active = false; int note = 0; double offBeat = 0.0; };
     LiveNote m_live[4];
@@ -1297,6 +2408,8 @@ private:
     bool m_shrinkOk = false, m_followOk = false;
     bool m_repeatOk = false;
     int m_probeNotes = 0;
+    bool m_ptOk[11] = {}; // paramtest assertions
+    bool m_stOk[8] = {};  // sampletest assertions
 };
 
 namespace {
@@ -1365,6 +2478,33 @@ bool writeSplashDumpPng(const char* path) {
 } // namespace
 
 int main(int argc, char** argv) {
+    std::setvbuf(stdout, nullptr, _IONBF, 0); // crash-safe logging
+#ifdef _WIN32
+    // Dev crash handler: print exception + symbolicated stack.
+    SetUnhandledExceptionFilter([](EXCEPTION_POINTERS* ep) -> LONG {
+        std::printf("\n!!! CRASH 0x%08X at %p (data %s %p)\n",
+                    ep->ExceptionRecord->ExceptionCode,
+                    ep->ExceptionRecord->ExceptionAddress,
+                    ep->ExceptionRecord->ExceptionInformation[0] ? "write"
+                                                                 : "read",
+                    (void*)ep->ExceptionRecord->ExceptionInformation[1]);
+        HANDLE proc = GetCurrentProcess();
+        SymInitialize(proc, nullptr, TRUE);
+        void* stack[32];
+        const USHORT n = CaptureStackBackTrace(0, 32, stack, nullptr);
+        auto* si = static_cast<SYMBOL_INFO*>(
+            malloc(sizeof(SYMBOL_INFO) + 256));
+        si->SizeOfStruct = sizeof(SYMBOL_INFO);
+        si->MaxNameLen = 255;
+        for (int i = 0; i < n; ++i)
+            if (SymFromAddr(proc, DWORD64(stack[i]), nullptr, si))
+                std::printf("  %s+0x%llx\n", si->Name,
+                            DWORD64(stack[i]) - si->Address);
+        free(si);
+        std::fflush(stdout);
+        return EXCEPTION_EXECUTE_HANDLER;
+    });
+#endif
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--fontchart") == 0) {
             const char* out = (i + 1 < argc && argv[i + 1][0] != '-')
@@ -1398,6 +2538,8 @@ int main(int argc, char** argv) {
     if (argc > 1 && std::strcmp(argv[1], "--uitest") == 0)   testMode = 3;
     if (argc > 1 && std::strcmp(argv[1], "--longtest") == 0) testMode = 4;
     if (argc > 1 && std::strcmp(argv[1], "--panelprobe") == 0) testMode = 5;
+    if (argc > 1 && std::strcmp(argv[1], "--paramtest") == 0) testMode = 6;
+    if (argc > 1 && std::strcmp(argv[1], "--sampletest") == 0) testMode = 7;
     App app;
     return app.run(testMode);
 }

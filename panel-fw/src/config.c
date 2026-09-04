@@ -24,6 +24,7 @@ static uint8_t g_fixed = 100;
 static uint8_t g_persist = 0;
 static uint8_t g_host_vel = 100;
 static bool dirty;
+static bool stored_valid;   // a valid config currently occupies the flash page
 static absolute_time_t dirty_since;
 
 static uint8_t crc8(const uint8_t *d, unsigned n) {
@@ -49,6 +50,7 @@ void config_init(void) {
         if (s->vel_src <= VSRC_HOST) g_src = s->vel_src;
         if (s->fixed) g_fixed = s->fixed;
         g_persist = s->persist ? 1 : 0;
+        stored_valid = true;
     }
 }
 
@@ -63,12 +65,19 @@ uint8_t config_velocity(void) {
     switch (g_src) {
     case VSRC_POT0: case VSRC_POT1: case VSRC_POT2:
     case VSRC_POT3: case VSRC_POT4: case VSRC_POT5:
-        v = ads_value((uint8_t)(ADS_POT0 + g_src - VSRC_POT0)) >> 5; break;
-    case VSRC_JOY_Y:  v = ads_value(ADS_JOY_Y) >> 5; break;
-    case VSRC_SLIDER: v = ads_value(ADS_SLIDER) >> 5; break;
+        v = (uint16_t)((uint32_t)ads_value((uint8_t)(ADS_POT0 + g_src - VSRC_POT0))
+                       * 127 / ADS_FULL_SCALE_RAW); break;
+    case VSRC_JOY_Y:
+        v = (uint16_t)((uint32_t)ads_value(ADS_JOY_Y)
+                       * 127 / ADS_FULL_SCALE_RAW); break;
+    case VSRC_SLIDER:
+        v = (uint16_t)((uint32_t)ads_value(ADS_SLIDER)
+                       * 127 / ADS_FULL_SCALE_RAW); break;
     case VSRC_FIXED:  v = g_fixed; break;
     case VSRC_HOST:   v = g_host_vel; break;
-    default:          v = ads_value(ADS_SLIDER) >> 5; break;
+    default:
+        v = (uint16_t)((uint32_t)ads_value(ADS_SLIDER)
+                       * 127 / ADS_FULL_SCALE_RAW); break;
     }
     if (v < 1) v = 1;
     if (v > 127) v = 127;
@@ -135,6 +144,9 @@ void config_service(void) {
     if (!dirty || !time_reached(delayed_by_us(dirty_since, COMMIT_DELAY_US)))
         return;
     dirty = false;
+    // Gate flash writes: with persistence on, save the accepted change; with
+    // persistence off, only erase when a valid stored config actually exists
+    // and must be invalidated (never erase a never-written page every boot).
     if (g_persist) {
         memset(page, 0xFF, sizeof(page));
         cfg_store_t s;
@@ -145,10 +157,13 @@ void config_service(void) {
         s.persist = g_persist;
         s.crc = crc8((const uint8_t *)&s, 8);
         memcpy(page, &s, sizeof(s));
-    } else {
+    } else if (stored_valid) {
         page[0] = 0xFF;                         // invalidate stored config
+    } else {
+        return;                                 // volatile, nothing stored
     }
     const uint32_t irq_save = save_and_disable_interrupts();
     commit_impl(NULL);
     restore_interrupts(irq_save);
+    stored_valid = g_persist != 0;
 }

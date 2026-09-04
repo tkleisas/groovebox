@@ -20,7 +20,7 @@ configured **velocity source**, 1–127 — slider by default, see
 |---|---|---|
 | 0–15 | 36–51 | white keys 1–16 (bottom row) |
 | 16–26 | 52–62 | black keys, left to right (C♯ pattern order) |
-| 27–30 | 63–66 | transport: PLAY, STOP, REC, (reserved) |
+| 27–30 | 63–66 | transport: PLAY, STOP, REC, joystick push (30) |
 | 31 | 67 | MODE |
 | 32, 33 | 68, 69 | < , > |
 | 34–37 | 70–73 | soft keys S1–S4 |

@@ -1,8 +1,9 @@
 # groovebox-panel firmware
 
 Panel module firmware for the groovebox control surface: a Raspberry Pi Pico
-scanning the 39-key HT16K33 matrix, 3x ADS1115 analog inputs, 4 push-encoders
-and 16 step LEDs, presenting everything as a stock USB-MIDI device named
+scanning 39 single-ended keys on 3x MCP23017 expanders, 3x ADS1115 analog
+inputs, 4 push-encoders and 16 LEDs driven by an HT16K33 (LED driver only,
+no key matrix), presenting everything as a stock USB-MIDI device named
 `groovebox-panel` — protocol v1 per [docs/panel-protocol.md](../docs/panel-protocol.md)
 (keys as Note On/Off ch1, pots/slider/joystick as CC, encoders relative CC,
 LEDs and the host velocity register on ch2, GRV SysEx 0x7D configuration).
@@ -63,11 +64,12 @@ CC32..35 push. Drive LEDs: Note On/Off ch2, note 0..15. Configuration SysEx:
 
 ## Bring-up knobs (hardware-verification points)
 
-- `HT16K33_KEY_BYTES` (board_config.h): key RAM read length — datasheet says
-  6 bytes for the 13x3 matrix; verify with an I2C monitor on first boot.
+- HT16K33 init sequence in `leds.c` (oscillator on 0x21, brightness 0xE0|8,
+  display on 0x81): the chip boots in standby — if no LED lights on first
+  boot, verify these writes land with an I2C monitor.
 - LED RAM mapping in `leds.c` (LED i -> RAM[i & 7] bit (i >> 3)) must match
   the keyboard PCB routing (ROW anode / COM cathode pairing).
-- `KEYMAP` (board_config.h): matrix cell -> panel key index; route the
-  keyboard PCB to match this identity table (or update the table).
+- `KEY_CHIPS` maps (board_config.h): MCP23017 pin -> panel key index; route
+  the keyboard PCB to match these tables (or update the tables).
 - Encoders: if one detent advances two steps per click, flip the qdec table
   orientation in `encoder.c`.

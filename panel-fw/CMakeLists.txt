@@ -25,6 +25,7 @@ target_link_libraries(panel PRIVATE
   pico_stdlib
   hardware_i2c
   hardware_flash
+  hardware_watchdog
   tinyusb_device
 )
 

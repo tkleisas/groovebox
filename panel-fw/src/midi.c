@@ -5,26 +5,38 @@
 
 #include <string.h>
 
+// TinyUSB stream_write returns the byte count actually accepted; a short
+// count means the TX FIFO is full (host not draining). Channel messages are
+// 3 bytes = one USB-MIDI packet, so a failed write queues nothing and the
+// stream stays consistent; we drop the message whole (never retry a partial
+// frame) and count the drop. A short SysEx likewise abandons that frame —
+// the config reply is idempotent and the brain re-queries.
+static unsigned tx_drops;
+
+static void send(const uint8_t *m, uint32_t n) {
+    if (tud_midi_n_stream_write(0, 0, m, n) != n) tx_drops++;
+}
+
 void midi_send_note_on(uint8_t ch, uint8_t note, uint8_t velocity) {
     uint8_t m[3] = { (uint8_t)(0x90 | ch), note, velocity };
-    tud_midi_n_stream_write(0, 0, m, 3);
+    send(m, 3);
 }
 
 void midi_send_note_off(uint8_t ch, uint8_t note) {
     uint8_t m[3] = { (uint8_t)(0x80 | ch), note, 0 };
-    tud_midi_n_stream_write(0, 0, m, 3);
+    send(m, 3);
 }
 
 void midi_send_cc(uint8_t ch, uint8_t cc, uint8_t value) {
     uint8_t m[3] = { (uint8_t)(0xB0 | ch), cc, value };
-    tud_midi_n_stream_write(0, 0, m, 3);
+    send(m, 3);
 }
 
 void midi_send_bend(uint8_t ch, uint16_t value14) {
     uint8_t m[3] = { (uint8_t)(0xE0 | ch),
                      (uint8_t)(value14 & 0x7F),
                      (uint8_t)(value14 >> 7) };
-    tud_midi_n_stream_write(0, 0, m, 3);
+    send(m, 3);
 }
 
 void midi_send_sysex(const uint8_t *inner, uint32_t len) {
@@ -33,7 +45,7 @@ void midi_send_sysex(const uint8_t *inner, uint32_t len) {
     m[0] = 0xF0;
     memcpy(&m[1], inner, len);
     m[len + 1] = 0xF7;
-    tud_midi_n_stream_write(0, 0, m, len + 2);
+    send(m, len + 2);
 }
 
 // ── RX parser ───────────────────────────────────────────────────────
