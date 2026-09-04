@@ -1,0 +1,121 @@
+(kicad_pcb
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(general
+		(thickness 1.6)
+		(legacy_teardrops no)
+	)
+	(paper "A2")
+	(layers
+		(0 "F.Cu" signal)
+		(31 "B.Cu" signal)
+		(36 "B.SilkS" user "B.Silkscreen")
+		(37 "F.SilkS" user "F.Silkscreen")
+		(38 "B.Mask" user)
+		(39 "F.Mask" user)
+		(40 "Dwgs.User" user "User.Drawings")
+		(41 "Cmts.User" user "User.Comments")
+		(44 "Edge.Cuts" user)
+		(45 "Margin" user)
+	)
+	(setup
+		(pad_to_mask_clearance 0)
+	)
+	(net 0 "")
+	(gr_line
+		(start 0 0)
+		(end 100 0)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+		(uuid "7be57a93-2c41-4d6e-a5b8-000000000064")
+	)
+	(gr_line
+		(start 100 0)
+		(end 100 80)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+		(uuid "7be57a93-2c41-4d6e-a5b8-000000000065")
+	)
+	(gr_line
+		(start 100 80)
+		(end 0 80)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+		(uuid "7be57a93-2c41-4d6e-a5b8-000000000066")
+	)
+	(gr_line
+		(start 0 80)
+		(end 0 0)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+		(uuid "7be57a93-2c41-4d6e-a5b8-000000000067")
+	)
+	(gr_circle
+		(center 5 5)
+		(end 6.6 5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill none)
+		(layer "Edge.Cuts")
+		(uuid "7be57a93-2c41-4d6e-a5b8-000000000068")
+	)
+	(gr_circle
+		(center 95 5)
+		(end 96.6 5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill none)
+		(layer "Edge.Cuts")
+		(uuid "7be57a93-2c41-4d6e-a5b8-000000000069")
+	)
+	(gr_circle
+		(center 5 75)
+		(end 6.6 75)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill none)
+		(layer "Edge.Cuts")
+		(uuid "7be57a93-2c41-4d6e-a5b8-00000000006a")
+	)
+	(gr_circle
+		(center 95 75)
+		(end 96.6 75)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill none)
+		(layer "Edge.Cuts")
+		(uuid "7be57a93-2c41-4d6e-a5b8-00000000006b")
+	)
+	(gr_text "NSR-2 brain board rev A - 100x80mm - M3 at corners - Pi Zero on 2x20 female, Audio Injector stacks above, screen on right-angle header, USB-A = Pi OTG breakout"
+		(at 50.0 86.0 0)
+		(layer "Cmts.User")
+		(uuid "7be57a93-2c41-4d6e-a5b8-00000000006c")
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.3)
+			)
+		)
+	)
+)

@@ -21,3 +21,17 @@ Thumbs.db
 *.kicad_sch-bak
 fp-info-cache
 
+# NSR-2 disposable artifacts (regenerable / vendor reference)
+nsr2/hardware/**/*.kicad_prl
+nsr2/hardware/**/erc*.json
+nsr2/hardware/**/io_net.net
+nsr2/hardware/**/*_outline.pdf
+nsr2/hardware/**/*_outline.png
+nsr2/hardware/**/*_sch.pdf
+nsr2/tools/__pycache__/
+nsr2/hardware/ht16k33_datasheet.pdf
+nsr2/hardware/ht16k33_ds2.pdf
+nsr2/hardware/HT16K33Av111.pdf
+nsr2/hardware/ht16k33_pins*.png
+nsr2/hardware/ht16k33a_28sop.png
+
