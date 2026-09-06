@@ -79,7 +79,9 @@ void Ui::drawHeader(const UiState& s, uint16_t* fb) {
     text(fb, 4, 1, 2, title, kColBlack);
     if (s.page == 1) {
         // SEQ page: keys mode marker + live transport clock (inverse).
-        text(fb, 44, 1, 2, s.mode == 0 ? "P" : s.mode == 1 ? "S" : "T",
+        text(fb, 44, 1, 2, s.nsr2
+                 ? (s.mode == 0 ? "P" : s.mode == 1 ? "S" : "T")
+                 : (s.scaleLock == 2 ? "C" : "M"),
              kColBlack);
         Canvas565 c{fb, kDisplayW, kDisplayH};
         TransportClockWidget clk{88, 0, s.clockBar, s.clockBeat,
@@ -89,7 +91,10 @@ void Ui::drawHeader(const UiState& s, uint16_t* fb) {
         // transport / mode marker
         const char* marker = s.recording ? "R" : (s.playing ? ">" : "");
         if (*marker) text(fb, 96, 1, 2, marker, kColBlack);
-        text(fb, 112, 1, 2, s.mode == 0 ? "PLAY" : s.mode == 1 ? "SEQ" : "TEXT", kColBlack);
+        text(fb, 112, 1, 2,
+             s.nsr2 ? (s.mode == 0 ? "PLAY" : s.mode == 1 ? "SEQ" : "TEXT")
+                    : (s.scaleLock == 2 ? "CHRM" : "MAJ"),
+             kColBlack);
     }
     // right-aligned track + BPM
     char right[16];
@@ -121,6 +126,11 @@ void Ui::drawFooter(const UiState& s, uint16_t* fb) {
 void Ui::pageSynth(const UiState& s, uint16_t* fb) {
     for (int i = 0; i < 6; ++i)
         drawParamRow(s.params[i], 18 + i * 16, i == s.selected, fb);
+    // macro strip: current bindings of encoders 5-8 ("5:A" style)
+    for (int i = 0; i < 4; ++i) {
+        if (!s.macroLabels[i]) continue;
+        text(fb, 4 + i * 60, 114, 1, s.macroLabels[i], kColDim);
+    }
     // Optional UTF-8 overlay line (demo / status)
     if (s.overlayLine) {
         text(fb, (kDisplayW - textWidth(s.overlayLine, 1)) / 2, 132, 1,

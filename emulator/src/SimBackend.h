@@ -60,9 +60,9 @@ private:
     int m_ledMax = -1;
 
     // Simulated analog state. Pot defaults mirror the UI mockup values.
+    // Simulated analog state (rev B2: 2 pots CUT/RES only).
     int m_selectedPot = 0;
-    float m_pots[6] = {87.f / 127.f, 41.f / 127.f, 3.f / 127.f,
-                       55.f / 127.f, 70.f / 127.f, 24.f / 127.f};
+    float m_pots[2] = {87.f / 127.f, 41.f / 127.f};
     float m_slider = 0.8f;
     bool m_joyActive = false;   // screen view: right-drag joystick
     float m_joyX = 0.0f, m_joyY = 0.0f;

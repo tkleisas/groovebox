@@ -19,14 +19,21 @@ namespace gb {
 constexpr int kDisplayW = 240;
 constexpr int kDisplayH = 160;
 
-constexpr int kNumEncoders = 4;
+constexpr int kNumEncoders = 8; // 4 pageable under screen + 4 amp ADSR (rev B2)
 constexpr int kNumLeds     = 16;
-constexpr int kMaxLeds     = 32; // NSR-2 grid
+constexpr int kMaxLeds     = 32; // NSR-1 rev B / NSR-2 grid
 
-// Panel profiles: NSR-1 (400x150 landscape, 39 piano keys) vs NSR-2
+// Panel profiles: NSR-1 (400x170 landscape, piano + step row) vs NSR-2
 // (180x210 portrait, 45 keys, 4x8 grid). Selected by --panel= at app
 // level; the backend renders the matching faceplate.
 enum PanelProfile { kPanelNSR1 = 0, kPanelNSR2 = 1 };
+
+// ── NSR-1 rev B: step row ───────────────────────────────────────────
+// Indices 40..55 (notes 76-91): the dedicated 16-key step row under the
+// piano (docs/panel-protocol.md rev B). The piano row (0..26) is always
+// playable; the step row is always the sequencer.
+enum { kKeyStep0 = 40 };
+constexpr int kMaxPanelKeys = 56; // NSR-1 rev B (NSR-2 uses 45)
 
 // ── NSR-2 panel key indices (docs/nsr2-design.md, panel-protocol) ───
 //  0..31  grid keys, row-major (top-left = 0)
@@ -84,16 +91,18 @@ enum Key {
     kKeyShiftR = 39,
 };
 
-// ── Analog channel indices ──────────────────────────────────────────
-//  0..5  pots: cutoff, resonance, amp-ENV A/D/S/R   (float 0..1)
-//  6     data slider (default: velocity)            (float 0..1)
-//  7..8  joystick X (pitch bend) / Y (mod)          (float -1..1)
+// ── Analog channel indices (NSR-1 rev B2) ───────────────────────────
+//  0..1  pots: cutoff, resonance                     (float 0..1)
+//  2     data slider (default: velocity)             (float 0..1)
+//  3..4  joystick X (pitch bend) / Y (mod)           (float -1..1)
+// (rev B2: amp A/D/S/R moved to dedicated encoders 5-8 — relative,
+//  not analog)
 enum Analog {
     kAnalogPot0   = 0,
-    kAnalogSlider = 6,
-    kAnalogJoyX   = 7,
-    kAnalogJoyY   = 8,
-    kNumAnalog    = 9,
+    kAnalogSlider = 2,
+    kAnalogJoyX   = 3,
+    kAnalogJoyY   = 4,
+    kNumAnalog    = 5,
 };
 
 // Application-side event sink. Called from the backend's poll().

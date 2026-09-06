@@ -16,9 +16,9 @@ namespace gb {
 // Live panel state, owned by the backend (SimBackend) and fed from the
 // same data that goes to the HAL handler.
 struct PanelState {
-    bool keyDown[kN2NumKeys] = {};       // sized for NSR-2 (45)
-    bool encoderPush[kNumEncoders] = {};
-    float pots[6] = {};         // 0..1, CUT/RES/A/D/S/R
+    bool keyDown[kMaxPanelKeys] = {};    // sized for NSR-1 rev B (56)
+    bool encoderPush[kNumEncoders] = {}; // 8 (rev B2)
+    float pots[2] = {};         // 0..1, CUT/RES only (rev B2)
     float slider = 0.8f;        // 0..1 (NSR-2: crossfader)
     float joyX = 0, joyY = 0;   // -1..1
     bool leds[kMaxLeds] = {};
@@ -31,7 +31,7 @@ class PanelView {
 public:
     static constexpr int kPxPerMm = 4;
     static constexpr int kW = 400 * kPxPerMm;  // 1600
-    static constexpr int kH = 150 * kPxPerMm;  // 600
+    static constexpr int kH = 170 * kPxPerMm;  // 680 (rev B: +20mm step row)
 
     enum HitType {
         kHitNone = 0,

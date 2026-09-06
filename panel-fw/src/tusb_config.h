@@ -18,6 +18,12 @@
 #define CFG_TUD_ENABLED            1
 #define CFG_TUD_ENDPOINT0_SIZE     64
 
+// TinyUSB 0.15 (pico-sdk 1.5.x): tusb_init() only brings up the device stack
+// when a port mode is declared — without this, tusb_init() is a silent no-op
+// (returns true, USB never connects). Mirrors the SDK's own device config
+// (pico_stdio_usb/include/tusb_config.h).
+#define CFG_TUSB_RHPORT0_MODE      (OPT_MODE_DEVICE)
+
 // One MIDI device, one jack.
 #define CFG_TUD_MIDI               1
 #define CFG_TUD_MIDI_EP_BUFSIZE    64

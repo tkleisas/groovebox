@@ -1,0 +1,19 @@
+[1/15] Performing build step for 'ELF2UF2Build'
+ninja: no work to do.
+[2/15] Performing build step for 'PioasmBuild'
+ninja: no work to do.
+[3/15] No install step for 'ELF2UF2Build'
+[4/15] No install step for 'PioasmBuild'
+[5/15] Completed 'ELF2UF2Build'
+[6/15] Completed 'PioasmBuild'
+[7/15] Building C object CMakeFiles/panel.dir/src/usb_descriptors.c.obj
+[8/15] Building C object CMakeFiles/panel.dir/src/leds.c.obj
+[9/15] Building C object CMakeFiles/panel.dir/src/encoder.c.obj
+[10/15] Building C object CMakeFiles/panel.dir/src/main.c.obj
+[11/15] Building C object CMakeFiles/panel.dir/src/ads1115.c.obj
+[12/15] Building C object CMakeFiles/panel.dir/src/midi.c.obj
+[13/15] Building C object CMakeFiles/panel.dir/src/keys.c.obj
+[14/15] Building C object CMakeFiles/panel.dir/src/config.c.obj
+[15/15] Linking CXX executable panel.elf
+
+OK ->  C:\Users\tasos\Documents\projects\groovebox\panel-fw\build\panel.uf2

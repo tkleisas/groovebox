@@ -59,9 +59,9 @@ Consequences:
 | Audio out (bench rig) | CJMCU-1334 = **UDA1334A** I2S DAC, already on hand + proven wiring (`hifiberry-dac` overlay). Playback only — no ADC | $0 |
 | Mic | Electret capsule behind top-panel hole → codec mic input | $2 |
 | Display | 4.0" SPI TFT 480×320 (ILI9488) — bigger pixels for eyesight; same driver, bus and 240×160@2× UI as 3.5" | $18 |
-| MX keyboard kit | 39 MX-style switches (Gateron Red / Silent Red, linear ~45 gf) + Kailh hot-swap sockets + keycap set (16 white, 11 black, colored for transport/shift/mode) + 39× 1N4148 diodes | $55 |
-| Button/LED driver | HT16K33 (I2C, in-switch LED driver) | $3 |
-| Key input expanders | 3× MCP23017 (I2C @ 0x20–0x22, 39 single-ended key inputs) | $6 |
+| MX keyboard kit | 55 MX-style switches (Gateron Red / Silent Red, linear ~45 gf) + Kailh hot-swap sockets + keycap set (16 white, 11 black, 16 step row, colored function keys) | $65 |
+| Button/LED driver | HT16K33 (I2C, drives 32 LEDs: 16 step row + 16 white keys) | $3 |
+| Key input expanders | 4× MCP23017 (I2C @ 0x20–0x23, 55 single-ended key inputs) | $8 |
 | Analog inputs | 3× ADS1115 16-bit ADC (I2C, addresses 0x48 / 0x49 / 0x4a) | $9 |
 | Pitch/mod | 2-axis spring-return thumbstick (X = pitch bend, Y = mod) | $4 |
 | Pots | 6× 10k linear: cutoff, resonance, A, D, S, R | $7 |
@@ -73,44 +73,52 @@ Consequences:
 
 ## Control surface
 
-- 16 step buttons (white keys) + 11 offset black keys in piano pattern:
-  **MX-style keyboard switches at 19.05 mm pitch** (Gateron Red / Silent
-  Red, linear ~45 gf) in **hot-swap sockets** (switch feel is changeable
-  without soldering), per-key LEDs in the switch slots, per-key diodes.
-  **Play mode**: a real ~2-octave chromatic keyboard (C–D, all sharps/flats)
-  on instrument tracks, or 27 sample pads on drum tracks; slider sets live
-  velocity. **Sequencer mode**: white row = steps, black row = per-step
-  accent/probability. External keybeds connect via DIN MIDI in (USB-MIDI
-  also possible on the OTG port).
+- **Dedicated step row (rev B)**: 16 MX switches *under* the keyboard, one
+  per step of the current 16-step window, each with an LED. The step row is
+  always the sequencer; the piano row is always playable — no mode split.
+  Gestures: tap step = toggle; **hold step + tap piano key = set that
+  step's pitch** (p-lock); hold step + encoder = gate; shift+step = accent;
+  shift+step on tracks 1–4 area = track select/mute.
+- Piano row: 16 white + 11 offset black keys in piano pattern,
+  **MX-style switches at 19.05 mm pitch** (Gateron Red / Silent Red, linear
+  ~45 gf) in **hot-swap sockets**, per-key LEDs (whites show held notes /
+  scale guides), always playable — 2-octave chromatic from C4, velocity
+  from the slider. MODE toggles keyboard scale-lock (chromatic ↔ scale).
+  External keybeds via DIN MIDI in (USB-MIDI on OTG also possible).
 - Transport: play, stop, rec.
 - **Two SHIFT keys** (1u MX keys), same logical modifier, at the two ends of
   the keyboard row — thumb/pinky pins shift while the other fingers hit the
   target, so every shift combo is a one-hand move:
-  - shift + step row → track select / mute / scene launch
+  - shift + step row → accent / track select / mute
   - shift + encoder → fine adjust / reset to default
-- **MODE** key: toggles sequencer mode ↔ play mode (a toggle, not a
-  shift-hold — both hands must be free to play).
+- **MODE** key: toggles keyboard scale-lock (chromatic ↔ scale-locked);
+  the sequencer and keyboard are always both live — no mode split.
 - **< / >** keys: previous/next event, page, or preset.
 - **4 soft menu keys** under the screen: functions shown as on-screen
   labels directly above each key (MPC-style menus, no legend needed).
 - 4 encoders with push (pageable parameters).
-- 6 pots: filter cutoff, filter resonance, amp-ENV attack / decay / sustain / release.
+- **8 encoders total (rev B2)**: 4 pageable + 4 dedicated amp-ENV
+  A/D/S/R (relative control — no pickup; envelope follows the track).
+  Encoder push-buttons live on spare MCP23017 inputs (quadrature stays on
+  16 direct GPIO).
+- 2 pots: filter cutoff + resonance (absolute performance controls).
 - 1 data slider (velocity entry; mappable).
 - 2-axis spring-return thumbstick left of the keyboard: X = pitch bend
   (centers on release), Y = mod, assignable (vibrato / filter / FX depth).
 - LEDs mirror pattern + playhead even when the screen shows another page.
 
-Front-panel layout: `docs/panel_mockup.png` (to scale, **400×150 mm panel** —
+Front-panel layout: `docs/panel_mockup.png` (to scale, **400×170 mm panel** —
 desktop-instrument class, Push 2 width; regenerate with
 `python tools/mockup_panel.py`). Screen-centric design: screen top-left with
 the 4 soft menu keys in a column beside it (menu labels drawn on screen next
 to each key) and the 4 encoders in a row directly beneath it (parameter
 labels + values on screen above each encoder). CUT/RES/A/D/S/R pots
 top-middle, transport + MODE/</> cluster top-right, pitch/mod thumbstick
-bottom-left, full-width MX-switch piano keyboard (16 white @ 19.05 mm pitch
-+ 11 offset black) along the bottom doubling as the step sequencer, 1u
-SHIFT keys at both row ends, horizontal 60 mm data slider above the
-keyboard's right end. The empty center holds the ВОКОИТЕР – ΟΡΓΑΝΟ 1 badge.
+bottom-left, full-width MX piano keyboard (16 white @ 19.05 mm + 11 offset
+black, always playable) above a **dedicated 16-key step row** (always the
+sequencer, per-step LEDs), 1u SHIFT keys at the piano row ends, horizontal
+60 mm data slider above the keyboard's right end. The center holds the
+ВОКОИТЕР – ΟΡΓΑΝΟ 1 badge.
 
 ## GPIO / I2C allocation
 
@@ -128,19 +136,20 @@ keyboard's right end. The empty center holds the ВОКОИТЕР – ΟΡΓΑΝ
 
 | Peripheral | Connection | Role |
 |---|---|---|
-| HT16K33 | I2C @ 0x70 | 16 in-switch LEDs (driver only — rev A key scan moved to expanders) |
-| 3× MCP23017 | I2C @ 0x20 / 0x21 / 0x22 | 39 key inputs, single-ended (48 available) |
-| 3× ADS1115 | I2C @ 0x48 / 0x49 / 0x4a | 9 analog inputs: 6 pots + slider + joystick (X/Y) |
-| 4 encoders | direct GPIO (12 pins) | quadrature + push |
+| HT16K33 | I2C @ 0x70 | 32 LEDs: 16 step-row + 16 white-key (driver only) |
+| 4× MCP23017 | I2C @ 0x20 / 0x21 / 0x22 / 0x23 | 55 keys + 8 encoder push-buttons, single-ended (64 available: 63 used) |
+| 2× ADS1115 | I2C @ 0x48 / 0x49 | 5 analog inputs: 2 pots (CUT/RES) + slider + joystick (X/Y) |
+| 8 encoders | direct GPIO (16 pins, quadrature A/B only) | encoders 1–4 pageable, 5–8 = ADSR |
 
 Notes:
-- All 39 keys (16 white + 11 black + 3 transport + 4 soft + MODE + < + > +
-  2 SHIFT) are **single-ended inputs on three MCP23017 I²C expanders** —
-  one uniform scan path, no matrix and no per-key diodes (rev A deviation
-  from the original HT16K33-matrix plan: the function keys are physically
-  distributed across the panel, and expanders keep the board-to-board link
-  at 4 wires with every key identical in hardware and firmware). The
-  HT16K33 remains solely as the driver for the 16 in-switch step LEDs.
+- All 55 keys (16 white + 11 black piano + **16 step row (rev B)** +
+  3 transport + 4 soft + MODE + < + > + 2 SHIFT) are **single-ended inputs
+  on four MCP23017 I²C expanders** — one uniform scan path, no matrix and
+  no per-key diodes (rev A deviation from the original HT16K33-matrix plan:
+  the function keys are physically distributed across the panel, and
+  expanders keep the board-to-board link at 4 wires with every key
+  identical in hardware and firmware). The HT16K33 is solely an LED driver:
+  16 step-row LEDs + 16 white-key LEDs.
 - Integrated mic: electret capsule wired to the WM8731 mic input (codec bias
   + PGA gain via ALSA mixer). Uses the codec's capture path, no extra bus or
   pins. The WM8731 runs in master mode off an onboard crystal since the Pi's

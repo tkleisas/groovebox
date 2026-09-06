@@ -4,9 +4,9 @@
 #include "hardware/i2c.h"
 #include "pico/stdlib.h"
 
-// Three ADS1115 in continuous mode, 860 SPS, +/-4.096 V PGA. Each 1 ms tick
+// Two ADS1115 in continuous mode, 860 SPS, +/-4.096 V PGA. Each 1 ms tick
 // reads one chip (last conversion) and advances its MUX, so every channel
-// refreshes about every 12 ms (~83 Hz) — ample for pots and bend.
+// refreshes about every 8 ms (~125 Hz) — ample for pots and bend.
 // Single-ended 16-bit reads: raw spans 0..32767 (0 V..PGA full scale).
 
 #define DR_860        0x07
@@ -14,22 +14,23 @@
 #define ADS_CONFIG(mux) (uint16_t)(0x8000 | ((4 + (mux)) << 12) | \
                         (PGA_4096 << 9) | (0u << 8) | (DR_860 << 5))
 
-static const uint8_t chip_addr[3] = { ADS_ADDR_CH0, ADS_ADDR_CH1, ADS_ADDR_CH2 };
-static const int8_t ch_map[3][4] = {
-    { ADS_POT0, ADS_POT1, ADS_POT2, ADS_POT3 },
-    { ADS_POT4, ADS_POT5, ADS_SLIDER, ADS_JOY_Y },
+static const uint8_t chip_addr[ADS_CHIP_COUNT] = { ADS_ADDR_CH0, ADS_ADDR_CH1 };
+static const int8_t ch_map[ADS_CHIP_COUNT][4] = {
+    { ADS_POT0, ADS_POT1, ADS_SLIDER, ADS_JOY_Y },
     { ADS_JOY_X, -1, -1, -1 },
 };
 
-static uint8_t mux[3];
+static uint8_t mux[ADS_CHIP_COUNT];
 static uint16_t value[ADS_CH_COUNT];
 static uint16_t last_sent[ADS_CH_COUNT];
 static unsigned chip_rr;
+static bool chip_offline[ADS_CHIP_COUNT];   // probe failed or chip dropped off the bus
 
-static void write_config(uint8_t addr, uint8_t m) {
+static int write_config(uint8_t addr, uint8_t m) {
     const uint16_t cfg = ADS_CONFIG(m);
     const uint8_t w[3] = { 0x01, (uint8_t)(cfg >> 8), (uint8_t)cfg };
-    i2c_write_blocking(PANEL_I2C, addr, w, 3, false);
+    return i2c_write_timeout_us(PANEL_I2C, addr, w, 3, false,
+                                PANEL_I2C_TIMEOUT_US);
 }
 
 static void process_channel(uint8_t ch, uint16_t raw) {
@@ -52,7 +53,7 @@ static void process_channel(uint8_t ch, uint16_t raw) {
                                               : last_sent[ch] - raw;
     if (diff < (ch == ADS_JOY_Y ? 128u : 64u)) return;           // hysteresis
     last_sent[ch] = raw;
-    const uint8_t cc = ch <= ADS_POT5 ? (uint8_t)(20 + ch)
+    const uint8_t cc = ch <= ADS_POT1 ? (uint8_t)(20 + ch)
                      : ch == ADS_SLIDER ? 26 : 1;
     uint8_t v = (uint8_t)((uint32_t)raw * 127 / ADS_FULL_SCALE_RAW);
     if (v > 127) v = 127;                        // raw above full scale: clamp
@@ -60,7 +61,16 @@ static void process_channel(uint8_t ch, uint16_t raw) {
 }
 
 void ads_init(void) {
-    for (unsigned c = 0; c < 3; c++) write_config(chip_addr[c], 0);
+    // The config write doubles as the presence probe: NACK/timeout marks the
+    // chip offline and ads_tick skips it (bounded bring-up on a bare board).
+    for (unsigned c = 0; c < ADS_CHIP_COUNT; c++)
+        chip_offline[c] = write_config(chip_addr[c], 0) < 0;
+}
+
+bool ads_any_offline(void) {
+    for (unsigned c = 0; c < ADS_CHIP_COUNT; c++)
+        if (chip_offline[c]) return true;
+    return false;
 }
 
 uint16_t ads_value(uint8_t ch) {
@@ -72,17 +82,28 @@ void ads_tick(void) {
     const uint8_t m = mux[chip_rr];
     const int8_t ch = ch_map[chip_rr][m];
 
+    if (chip_offline[chip_rr]) {             // never block on absent chips
+        chip_rr = (chip_rr + 1) % ADS_CHIP_COUNT;
+        return;
+    }
+
     uint8_t reg = 0x00;
     uint8_t d[2];
-    if (i2c_write_blocking(PANEL_I2C, addr, &reg, 1, true) >= 0 &&
-        i2c_read_blocking(PANEL_I2C, addr, d, 2, false) >= 0) {
+    if (i2c_write_timeout_us(PANEL_I2C, addr, &reg, 1, true,
+                             PANEL_I2C_TIMEOUT_US) >= 0 &&
+        i2c_read_timeout_us(PANEL_I2C, addr, d, 2, false,
+                            PANEL_I2C_TIMEOUT_US) >= 0) {
         const uint16_t raw = (uint16_t)((d[0] << 8) | d[1]);
         if (ch >= 0) {
             value[ch] = raw;
             process_channel((uint8_t)ch, raw);
         }
+    } else {
+        chip_offline[chip_rr] = true;        // dropped off the bus mid-run
+        chip_rr = (chip_rr + 1) % ADS_CHIP_COUNT;
+        return;
     }
     mux[chip_rr] = (uint8_t)((m + 1) & 3);
     write_config(addr, mux[chip_rr]);
-    chip_rr = (chip_rr + 1) % 3;
+    chip_rr = (chip_rr + 1) % ADS_CHIP_COUNT;
 }

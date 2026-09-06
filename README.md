@@ -121,6 +121,8 @@ groovebox_sim --paramtest   pot pickup / encoder ownership / FX (11/11)
 groovebox_sim --sampletest  mic capture → trim → assign → browser (8/8)
 groovebox_sim --panelprobe  synthetic mouse → HAL events (3/3)
 groovebox_sim --panel=nsr2 --nsr2test    NSR-2 grid semantics (6/6)
+groovebox_sim --revbtest    NSR-1 rev B: step row, p-lock, scale lock (6/6)
+groovebox_sim --macrotest   macro encoder assign/bind/reset/persist (6/6)
 groovebox_sim --panel=nsr2 --panelprobe  synthetic mouse on NSR-2 (3/3)
 groovebox_sim --widgets     widget showcase → docs/widgets.png
 groovebox_sim --fontchart   font chart → docs/fontchart.png

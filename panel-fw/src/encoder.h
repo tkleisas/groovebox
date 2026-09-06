@@ -3,4 +3,4 @@
 #include <stdint.h>
 
 void encoder_init(void);
-void encoder_tick(void);   // emit relative CC16..19, debounced pushes CC32..35
+void encoder_tick(void);   // emit relative CC16..23 (pushes CC32..39: keys.c)

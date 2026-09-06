@@ -64,9 +64,15 @@ uint8_t config_velocity(void) {
     uint16_t v;
     switch (g_src) {
     case VSRC_POT0: case VSRC_POT1: case VSRC_POT2:
-    case VSRC_POT3: case VSRC_POT4: case VSRC_POT5:
-        v = (uint16_t)((uint32_t)ads_value((uint8_t)(ADS_POT0 + g_src - VSRC_POT0))
+    case VSRC_POT3: case VSRC_POT4: case VSRC_POT5: {
+        // Rev B2 has 2 pots (CUT/RES): legacy src codes 0x03-0x06 clamp to
+        // the last real pot (RESONANCE) — a legacy host gets a live analog
+        // velocity rather than silence or a dead fixed value.
+        unsigned pot = g_src - VSRC_POT0;
+        if (pot >= ADS_POT_COUNT) pot = ADS_POT_COUNT - 1;
+        v = (uint16_t)((uint32_t)ads_value((uint8_t)(ADS_POT0 + pot))
                        * 127 / ADS_FULL_SCALE_RAW); break;
+    }
     case VSRC_JOY_Y:
         v = (uint16_t)((uint32_t)ads_value(ADS_JOY_Y)
                        * 127 / ADS_FULL_SCALE_RAW); break;

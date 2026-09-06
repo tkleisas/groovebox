@@ -96,10 +96,14 @@ struct UiState {
     int settingsSel = 0;               // 0..3
     const char* settingsVal[4] = {};   // value strings per row
 
+    // Macro encoder (5-8) bindings, shown as a strip on the SYNTH page
+    const char* macroLabels[4] = {};
+
     // NSR-2 additions
     bool nsr2 = false;
     const char* textBuf = nullptr;     // text-entry mode buffer
     int textCursor = 0;
+    int scaleLock = 2;                 // 0=major 1=minor 2=chromatic
 
     // confirm dialog overlay
     bool dialogActive = false;

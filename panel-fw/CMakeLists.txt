@@ -34,3 +34,20 @@ pico_enable_stdio_usb(panel 0)
 pico_enable_stdio_uart(panel 0)
 
 pico_add_extra_outputs(panel)   # .uf2 among others
+
+# Minimal known-good enumeration test device ("gb-usb-test") -> usb_test.uf2
+add_executable(usb_test
+  src/usb_test.c
+)
+
+target_include_directories(usb_test PRIVATE src)
+
+target_link_libraries(usb_test PRIVATE
+  pico_stdlib
+  tinyusb_device
+)
+
+pico_enable_stdio_usb(usb_test 0)
+pico_enable_stdio_uart(usb_test 0)
+
+pico_add_extra_outputs(usb_test)

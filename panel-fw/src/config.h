@@ -9,6 +9,8 @@
 enum {
     VSRC_SLIDER = 0,        // power-up default (rev A behavior)
     VSRC_POT0 = 1, VSRC_POT1, VSRC_POT2, VSRC_POT3, VSRC_POT4, VSRC_POT5,
+                            // rev B2: only 0x01/0x02 (CUT/RES) are real pots;
+                            // 0x03-0x06 clamp to VSRC_POT1 (see config.c)
     VSRC_JOY_Y  = 7,
     VSRC_FIXED  = 8,        // fixed value (config.fixed)
     VSRC_HOST   = 9,        // host register (CC 27, channel 2)

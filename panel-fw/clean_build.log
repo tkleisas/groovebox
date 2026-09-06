@@ -1,0 +1,249 @@
+Using PICO_SDK_PATH from environment ('C:\Users\tasos\pico-tools\pico-sdk')
+PICO_SDK_PATH is C:/Users/tasos/pico-tools/pico-sdk
+Defaulting PICO_PLATFORM to rp2040 since not specified.
+Defaulting PICO platform compiler to pico_arm_gcc since not specified.
+PICO compiler is pico_arm_gcc
+-- The C compiler identification is GNU 13.2.1
+-- The CXX compiler identification is GNU 13.2.1
+-- The ASM compiler identification is GNU
+-- Found assembler: C:/Users/tasos/pico-tools/arm-gnu-toolchain-13.2.Rel1-mingw-w64-i686-arm-none-eabi/bin/arm-none-eabi-gcc.exe
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: C:/Users/tasos/pico-tools/arm-gnu-toolchain-13.2.Rel1-mingw-w64-i686-arm-none-eabi/bin/arm-none-eabi-gcc.exe - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Users/tasos/pico-tools/arm-gnu-toolchain-13.2.Rel1-mingw-w64-i686-arm-none-eabi/bin/arm-none-eabi-g++.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+Build type is Release
+Defaulting PICO target board to pico since not specified.
+Using board configuration from C:/Users/tasos/pico-tools/pico-sdk/src/boards/include/boards/pico.h
+-- Found Python3: C:/Python313/python.exe (found version "3.13.5") found components: Interpreter
+TinyUSB available at C:/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/portable/raspberrypi/rp2040; enabling build support for USB.
+BTstack available at C:/Users/tasos/pico-tools/pico-sdk/lib/btstack
+cyw43-driver available at C:/Users/tasos/pico-tools/pico-sdk/lib/cyw43-driver
+Pico W Bluetooth build support available.
+lwIP available at C:/Users/tasos/pico-tools/pico-sdk/lib/lwip
+mbedtls available at C:/Users/tasos/pico-tools/pico-sdk/lib/mbedtls
+-- Configuring done (8.6s)
+-- Generating done (1.1s)
+-- Build files have been written to: C:/Users/tasos/Documents/projects/groovebox/panel-fw/build
+[1/161] Creating directories for 'ELF2UF2Build'
+[2/161] Building ASM object pico-sdk/src/rp2_common/boot_stage2/CMakeFiles/bs2_default.dir/compile_time_choice.S.obj
+[3/161] Creating directories for 'PioasmBuild'
+[4/161] No download step for 'ELF2UF2Build'
+[5/161] No download step for 'PioasmBuild'
+[6/161] No update step for 'ELF2UF2Build'
+[7/161] No update step for 'PioasmBuild'
+[8/161] Linking ASM executable pico-sdk\src\rp2_common\boot_stage2\bs2_default.elf
+[9/161] Generating bs2_default.bin
+[10/161] No patch step for 'ELF2UF2Build'
+[11/161] No patch step for 'PioasmBuild'
+[12/161] Generating bs2_default_padded_checksummed.S
+[13/161] Performing configure step for 'PioasmBuild'
+loading initial cache file C:/Users/tasos/Documents/projects/groovebox/panel-fw/build/pico-sdk/src/rp2_common/tinyusb/pioasm/tmp/PioasmBuild-cache-Release.cmake
+CMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- The CXX compiler identification is MSVC 19.51.36256.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (2.9s)
+-- Generating done (0.1s)
+-- Build files have been written to: C:/Users/tasos/Documents/projects/groovebox/panel-fw/build/pioasm
+[14/161] Performing configure step for 'ELF2UF2Build'
+-- The C compiler identification is MSVC 19.51.36256.0
+-- The CXX compiler identification is MSVC 19.51.36256.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (5.5s)
+-- Generating done (0.3s)
+-- Build files have been written to: C:/Users/tasos/Documents/projects/groovebox/panel-fw/build/elf2uf2
+[15/161] Performing build step for 'ELF2UF2Build'
+[1/2] Building CXX object CMakeFiles\elf2uf2.dir\main.cpp.obj
+C:\Users\tasos\pico-tools\pico-sdk\tools\elf2uf2\main.cpp(391): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\Users\tasos\pico-tools\pico-sdk\tools\elf2uf2\main.cpp(397): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+[2/2] Linking CXX executable elf2uf2.exe
+[16/161] No install step for 'ELF2UF2Build'
+[17/161] Completed 'ELF2UF2Build'
+[18/161] Building C object CMakeFiles/panel.dir/src/encoder.c.obj
+[19/161] Building C object CMakeFiles/panel.dir/src/ads1115.c.obj
+[20/161] Building C object CMakeFiles/panel.dir/src/usb_descriptors.c.obj
+[21/161] Building C object CMakeFiles/panel.dir/src/leds.c.obj
+[22/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_claim/claim.c.obj
+[23/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_platform/platform.c.obj
+[24/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_sync/sync.c.obj
+[25/161] Building C object CMakeFiles/panel.dir/src/keys.c.obj
+[26/161] Building C object CMakeFiles/panel.dir/src/midi.c.obj
+[27/161] Building C object CMakeFiles/panel.dir/src/main.c.obj
+[28/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_stdlib/stdlib.c.obj
+[29/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_gpio/gpio.c.obj
+[30/161] Building C object CMakeFiles/panel.dir/src/config.c.obj
+[31/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_sync/critical_section.c.obj
+[32/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_irq/irq_handler_chain.S.obj
+[33/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_sync/lock_core.c.obj
+[34/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_irq/irq.c.obj
+[35/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_sync/mutex.c.obj
+[36/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_util/datetime.c.obj
+[37/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_sync/sem.c.obj
+[38/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_time/timeout_helper.c.obj
+[39/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_timer/timer.c.obj
+[40/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_pll/pll.c.obj
+[41/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_uart/uart.c.obj
+[42/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_vreg/vreg.c.obj
+[43/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_util/queue.c.obj
+[44/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_time/time.c.obj
+[45/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_divider/divider.S.obj
+[46/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_clocks/clocks.c.obj
+[47/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_bit_ops/bit_ops_aeabi.S.obj
+[48/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_util/pheap.c.obj
+[49/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_watchdog/watchdog.c.obj
+[50/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_divider/divider.S.obj
+[51/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_double/double_aeabi.S.obj
+[52/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_xosc/xosc.c.obj
+[53/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_double/double_v1_rom_shim.S.obj
+[54/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_bootrom/bootrom.c.obj
+[55/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_double/double_init_rom.c.obj
+[56/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_int64_ops/pico_int64_ops_aeabi.S.obj
+[57/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_float/float_v1_rom_shim.S.obj
+[58/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_mem_ops/mem_ops_aeabi.S.obj
+[59/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_float/float_aeabi.S.obj
+[60/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_runtime/runtime.c.obj
+[61/161] Building ASM object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_standard_link/crt0.S.obj
+[62/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_float/float_init_rom.c.obj
+[63/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_malloc/pico_malloc.c.obj
+[64/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_standard_link/binary_info.c.obj
+[65/161] Building CXX object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_standard_link/new_delete.cpp.obj
+[66/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_printf/printf.c.obj
+[67/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_flash/flash.c.obj
+[68/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_float/float_math.c.obj
+[69/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/cdc/cdc_device.c.obj
+[70/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/audio/audio_device.c.obj
+[71/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/portable/raspberrypi/rp2040/rp2040_usb.c.obj
+[72/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_i2c/i2c.c.obj
+[73/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_stdio/stdio.c.obj
+[74/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_double/double_math.c.obj
+[75/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/device/usbd_control.c.obj
+[76/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/dfu/dfu_device.c.obj
+[77/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/hid/hid_device.c.obj
+[78/161] Performing build step for 'PioasmBuild'
+[1/10] Building CXX object CMakeFiles\pioasm.dir\pio_disassembler.cpp.obj
+[2/10] Building CXX object CMakeFiles\pioasm.dir\hex_output.cpp.obj
+[3/10] Building CXX object CMakeFiles\pioasm.dir\c_sdk_output.cpp.obj
+[4/10] Building CXX object CMakeFiles\pioasm.dir\ada_output.cpp.obj
+[5/10] Building CXX object CMakeFiles\pioasm.dir\python_output.cpp.obj
+[6/10] Building CXX object CMakeFiles\pioasm.dir\main.cpp.obj
+C:\Users\tasos\pico-tools\pico-sdk\tools\pioasm\pio_types.h(272): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+[7/10] Building CXX object CMakeFiles\pioasm.dir\gen\lexer.cpp.obj
+C:\Users\tasos\pico-tools\pico-sdk\tools\pioasm\pio_types.h(272): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+[8/10] Building CXX object CMakeFiles\pioasm.dir\gen\parser.cpp.obj
+C:\Users\tasos\pico-tools\pico-sdk\tools\pioasm\pio_types.h(272): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+[9/10] Building CXX object CMakeFiles\pioasm.dir\pio_assembler.cpp.obj
+C:\Users\tasos\pico-tools\pico-sdk\tools\pioasm\pio_types.h(272): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\tasos\pico-tools\pico-sdk\tools\pioasm\pio_assembler.cpp(132): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\tasos\pico-tools\pico-sdk\tools\pioasm\pio_assembler.cpp(141): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+[10/10] Linking CXX executable pioasm.exe
+[79/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/dfu/dfu_rt_device.c.obj
+[80/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/portable/raspberrypi/rp2040/dcd_rp2040.c.obj
+[81/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/msc/msc_device.c.obj
+[82/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/net/ncm_device.c.obj
+[83/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/net/ecm_rndis_device.c.obj
+[84/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/video/video_device.c.obj
+[85/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/usbtmc/usbtmc_device.c.obj
+[86/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/vendor/vendor_device.c.obj
+[87/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/dcd_pio_usb.c.obj
+[88/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/device/usbd.c.obj
+[89/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_fix/rp2040_usb_device_enumeration/rp2040_usb_device_enumeration.c.obj
+[90/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/midi/midi_device.c.obj
+[91/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_platform/platform.c.obj
+[92/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_claim/claim.c.obj
+[93/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_irq/irq_handler_chain.S.obj
+[94/161] Building C object CMakeFiles/usb_test.dir/src/usb_test.c.obj
+[95/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_sync/sync.c.obj
+[96/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_stdlib/stdlib.c.obj
+[97/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_sync/lock_core.c.obj
+[98/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_gpio/gpio.c.obj
+[99/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_sync/sem.c.obj
+[100/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/tusb.c.obj
+[101/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_time/timeout_helper.c.obj
+[102/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_irq/irq.c.obj
+[103/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_sync/critical_section.c.obj
+[104/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_util/datetime.c.obj
+[105/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_sync/mutex.c.obj
+[106/161] Building C object CMakeFiles/panel.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/common/tusb_fifo.c.obj
+[107/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_vreg/vreg.c.obj
+[108/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_divider/divider.S.obj
+[109/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_timer/timer.c.obj
+[110/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_util/queue.c.obj
+[111/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_xosc/xosc.c.obj
+[112/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_util/pheap.c.obj
+[113/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_bit_ops/bit_ops_aeabi.S.obj
+[114/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_watchdog/watchdog.c.obj
+[115/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_clocks/clocks.c.obj
+[116/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_pll/pll.c.obj
+[117/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/hardware_uart/uart.c.obj
+[118/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/common/pico_time/time.c.obj
+[119/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_divider/divider.S.obj
+[120/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_double/double_aeabi.S.obj
+[121/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_bootrom/bootrom.c.obj
+[122/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_double/double_v1_rom_shim.S.obj
+[123/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_int64_ops/pico_int64_ops_aeabi.S.obj
+[124/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_runtime/runtime.c.obj
+[125/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_float/float_aeabi.S.obj
+[126/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_mem_ops/mem_ops_aeabi.S.obj
+[127/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_float/float_v1_rom_shim.S.obj
+[128/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_double/double_init_rom.c.obj
+[129/161] Building ASM object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_standard_link/crt0.S.obj
+[130/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_float/float_init_rom.c.obj
+[131/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_malloc/pico_malloc.c.obj
+[132/161] Building CXX object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_standard_link/new_delete.cpp.obj
+[133/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_standard_link/binary_info.c.obj
+[134/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/audio/audio_device.c.obj
+[135/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/dfu/dfu_device.c.obj
+[136/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_printf/printf.c.obj
+[137/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/cdc/cdc_device.c.obj
+[138/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/portable/raspberrypi/rp2040/rp2040_usb.c.obj
+[139/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/dfu/dfu_rt_device.c.obj
+[140/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/hid/hid_device.c.obj
+[141/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_double/double_math.c.obj
+[142/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_float/float_math.c.obj
+[143/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/portable/raspberrypi/rp2040/dcd_rp2040.c.obj
+[144/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_stdio/stdio.c.obj
+[145/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/device/usbd_control.c.obj
+[146/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/msc/msc_device.c.obj
+[147/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/net/ncm_device.c.obj
+[148/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/net/ecm_rndis_device.c.obj
+[149/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/usbtmc/usbtmc_device.c.obj
+[150/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/video/video_device.c.obj
+[151/161] No install step for 'PioasmBuild'
+[152/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/dcd_pio_usb.c.obj
+[153/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/vendor/vendor_device.c.obj
+[154/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/class/midi/midi_device.c.obj
+[155/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/device/usbd.c.obj
+[156/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/src/rp2_common/pico_fix/rp2040_usb_device_enumeration/rp2040_usb_device_enumeration.c.obj
+[157/161] Completed 'PioasmBuild'
+[158/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/tusb.c.obj
+[159/161] Building C object CMakeFiles/usb_test.dir/C_/Users/tasos/pico-tools/pico-sdk/lib/tinyusb/src/common/tusb_fifo.c.obj
+[160/161] Linking CXX executable panel.elf
+[161/161] Linking CXX executable usb_test.elf
+
+OK ->  C:\Users\tasos\Documents\projects\groovebox\panel-fw\build\panel.uf2

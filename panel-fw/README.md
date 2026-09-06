@@ -1,8 +1,9 @@
 # groovebox-panel firmware
 
 Panel module firmware for the groovebox control surface: a Raspberry Pi Pico
-scanning 39 single-ended keys on 3x MCP23017 expanders, 3x ADS1115 analog
-inputs, 4 push-encoders and 16 LEDs driven by an HT16K33 (LED driver only,
+scanning 55 single-ended keys plus 8 encoder pushes on 4x MCP23017 expanders,
+2x ADS1115 analog inputs (CUT/RES pots, slider, joystick X/Y), 8 encoders
+(5-8 = ADSR) and 32 LEDs driven by an HT16K33 (LED driver only,
 no key matrix), presenting everything as a stock USB-MIDI device named
 `groovebox-panel` — protocol v1 per [docs/panel-protocol.md](../docs/panel-protocol.md)
 (keys as Note On/Off ch1, pots/slider/joystick as CC, encoders relative CC,
@@ -16,10 +17,10 @@ LEDs and the host velocity register on ch2, GRV SysEx 0x7D configuration).
     src/main.c              superloop + 1 ms tick
     src/usb_descriptors.c   "groovebox-panel" MIDI device (VID 0x2E8A, PID 0x4720)
     src/midi.c/.h           TX helpers + RX parser (ch2 notes/CC27/SysEx)
-    src/keys.c/.h           all 39 keys on 3x MCP23017, uniform debounced scan
-    src/ads1115.c/.h        3 chips round-robin, ~83 Hz/channel, hysteresis
-    src/encoder.c/.h        quadrature IRQ + 30 ms push debounce
-    src/leds.c/.h           16-LED RAM mapping (HT16K33 LED driver) + re-assert
+    src/keys.c/.h           55 keys + 8 encoder pushes on 4x MCP23017, debounced scan
+    src/ads1115.c/.h        2 chips round-robin, ~125 Hz/channel, hysteresis
+    src/encoder.c/.h        8x quadrature IRQ (pushes ride the key scan)
+    src/leds.c/.h           32-LED RAM mapping (HT16K33 LED driver) + re-assert
     src/config.c/.h         velocity source routing, GRV SysEx, flash persistence
 
 ## Building (Windows)
@@ -54,8 +55,9 @@ SWD (Pico H 3-pin) works too.
 The panel is a plain class-compliant USB-MIDI device: plug it into any PC and
 watch events in a MIDI monitor (amidi / MIDI-OX / web MIDI). Key presses emit
 Note On ch1 (36 + key index, velocity from the active source); pots emit
-CC20..25, the slider CC26, joystick CC1/bend; encoders CC16..19 relative and
-CC32..35 push. Drive LEDs: Note On/Off ch2, note 0..15. Configuration SysEx:
+CC20/21 (CUT/RES), the slider CC26, joystick CC1/bend; encoders CC16..23
+relative (5-8 = ADSR) and CC32..39 push. Drive LEDs: Note On/Off ch2, note
+0..31 (0..15 step row, 16..31 white keys). Configuration SysEx:
 
     set velocity source = fixed 100   F0 7D 47 52 56 01 08 64 F7
     query capabilities                F0 7D 47 52 56 02 F7

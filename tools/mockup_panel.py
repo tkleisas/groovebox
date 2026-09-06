@@ -3,7 +3,7 @@ MX-switch version: 370x150mm panel, 19.05mm key pitch."""
 from PIL import Image, ImageDraw, ImageFont
 
 S = 6  # px per mm
-PW, PH = 400, 150          # panel size in mm
+PW, PH = 400, 170          # panel size in mm
 M = 30
 W, H = PW * S + 2 * M, PH * S + 2 * M + 40
 
@@ -94,10 +94,12 @@ for i, y in enumerate((14, 29, 44, 59)):
 for cx in (20, 45, 70, 95):
     knob(cx, 88, 7, "")
 
-# pots: filter + ADSR
-label("FILTER", 136, 17)
-label("AMP ENVELOPE", 172, 17)
-for cx, lbl in ((140, "CUT"), (158, "RES"), (176, "A"), (192, "D"), (208, "S"), (224, "R")):
+# pots (filter) + ADSR encoders, top middle
+label("FILTER", 134, 17)
+label("AMP ENVELOPE", 176, 17)
+knob(140, 32, 6, "CUT")
+knob(158, 32, 6, "RES")
+for cx, lbl in ((184, "A"), (202, "D"), (220, "S"), (238, "R")):
     knob(cx, 32, 6, lbl)
 
 # transport: top-right
@@ -140,6 +142,12 @@ for i in range(16):
 for i in (0, 1, 3, 4, 5, 7, 8, 10, 11, 12, 14):
     bx = KB_X + 19.05 * (i + 1) - 9.55
     mx_key(bx, BY, (18, 18, 22))
+
+# dedicated step row (rev B): 16 MX keys under the piano, aligned to whites
+SY = 147
+for i in range(16):
+    mx_key(KB_X + i * 19.05, SY, (60, 60, 66), led=(i in (0, 4, 8, 12)), lbl=str(i + 1))
+label("STEPS", KB_X + 16 * 19.05 + 8, SY + 7)
 
 # rear-edge callouts
 d.text((M, M + PH * S + 8),

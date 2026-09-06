@@ -65,10 +65,10 @@ static void dispatch(void) {
     uint8_t st = last_status & 0xF0;
     uint8_t ch = last_status & 0x0F;
     if (ch != 1) return;                      // only channel 2 inbound
-    if (st == 0x90 && msg[1] > 0) {           // Note On -> LED index 0..15
-        if (msg[0] < 16) leds_set(msg[0], true);
+    if (st == 0x90 && msg[1] > 0) {           // Note On -> LED index 0..31
+        if (msg[0] < LED_COUNT) leds_set(msg[0], true);
     } else if (st == 0x80 || (st == 0x90 && msg[1] == 0)) {
-        if (msg[0] < 16) leds_set(msg[0], false);
+        if (msg[0] < LED_COUNT) leds_set(msg[0], false);
     } else if (st == 0xB0 && msg[0] == 27) {  // host velocity register
         config_set_host_velocity(msg[1]);
     }

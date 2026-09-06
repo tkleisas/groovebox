@@ -163,7 +163,10 @@ public:
                     : testMode == 4 ? " (long-pattern test)"
                     : testMode == 5 ? " (panel mouse probe)"
                     : testMode == 6 ? " (parameter/FX test)"
-                    : testMode == 7 ? " (sample/settings test)" : "");
+                    : testMode == 7 ? " (sample/settings test)"
+                    : testMode == 8 ? " (NSR-2 grid test)"
+                    : testMode == 9 ? " (NSR-1 rev B test)"
+                    : testMode == 10 ? " (macro encoder test)" : "");
 
         if (!m_hal.init(*this)) return 1;
 
@@ -198,15 +201,21 @@ public:
         // Bind pot/encoder params by name and sync the panel to the
         // engine: pots start engaged at the panel's default positions
         // (real panels adopt physical state at boot; pickup re-arms on
-        // track/page changes only).
+        // track/page changes only). ADSR encoders are relative.
+        for (int t = 0; t < 4; ++t) // -1 = factory ADSR default
+            for (int i = 0; i < 4; ++i)
+                m_macroParamByTrack[t][i] = -1;
         rebindParams();
-        for (int i = 0; i < 6; ++i) {
+        for (int i = 0; i < 2; ++i) {
             if (m_potParam[i] >= 0) {
                 setNormParam(m_potParam[i], m_state.params[i].value / 127.0f);
                 m_potEngaged[i] = true;
                 m_potPrev[i] = m_state.params[i].value / 127.0f;
             }
         }
+        for (int i = 0; i < 4; ++i)
+            if (m_adsrParam[i] >= 0)
+                setNormParam(m_adsrParam[i], m_state.params[2 + i].value / 127.0f);
 
         // FX chooser list: descriptor display names + "NONE".
         for (const auto& d : yawn::audioEffectDescriptors())
@@ -284,6 +293,7 @@ public:
             if (m_state.toastActive &&
                 std::chrono::steady_clock::now() >= m_toastUntil)
                 m_state.toastActive = false;
+            macroTimeout(); // 3 s macro-assign timeout
             if (m_testMode) testStep(t0); // after state updates
 
             if (m_splash) {
@@ -324,6 +334,8 @@ public:
         if (m_testMode == 6) return paramtestVerdict();
         if (m_testMode == 7) return sampletestVerdict();
         if (m_testMode == 8) return nsr2testVerdict();
+        if (m_testMode == 9) return revbtestVerdict();
+        if (m_testMode == 10) return macrotestVerdict();
         return 0;
     }
 
@@ -343,8 +355,25 @@ public:
     // Encoder push = reset that param to its default (SYNTH: bound
     // instrument param; FX: effect param).
     void onEncoderPush(int index, bool pressed) override {
-        if (!pressed || index < 0 || index > 3 || m_state.chooserOpen)
+        if (!pressed || index < 0 || index > 7 || m_state.chooserOpen)
             return;
+        // Macro encoders 5-8: push = reset bound param to its default;
+        // shift+push = enter ASSIGN (push again cancels).
+        if (index >= 4) {
+            const int slot = index - 4;
+            if (shiftHeld()) { macroPushAssign(slot); return; }
+            if (m_assignMacro == slot) { macroPushAssign(slot); return; }
+            const int p = m_macroParam[slot];
+            auto* inst = selInstrument();
+            if (inst && p >= 0) {
+                const auto& pi = inst->parameterInfo(p);
+                inst->setParameter(p, pi.defaultValue);
+                toast("RESET", pi.name);
+                std::printf("[panel] macro %d %s -> default\n", slot + 1,
+                            pi.name);
+            }
+            return;
+        }
         if (m_state.page == 0) {
             const int p = m_encParam[index];
             auto* inst = selInstrument();
@@ -392,6 +421,12 @@ public:
             return;
         }
         if (index == kKeyShiftL || index == kKeyShiftR) {
+            // rev B: tapping SHIFT while a step is held = accent that
+            // step (single gesture, works on all 16 step keys)
+            if (pressed && m_heldStep >= 0 && m_heldRow < 0) {
+                toggleAccent(m_window + m_heldStep);
+                m_heldEdited = true;
+            }
             if (index == kKeyShiftL) m_shiftL = pressed;
             else                     m_shiftR = pressed;
             return;
@@ -412,46 +447,17 @@ public:
             if (pressed && m_state.mode == 2) textType(' ');
             return;
         }
+        // NSR-1 rev B: the step row (40..55) is ALWAYS the sequencer.
+        if (!m_nsr2 && index >= kKeyStep0 && index < kKeyStep0 + 16) {
+            onStepRowKey(index - kKeyStep0, pressed);
+            return;
+        }
         // Piano keys (white 0..15, black 16..26)
         if (index >= kKeyWhite0 && index <= 26) {
-            if (shiftHeld()) {
-                // shift + white 1-4 = track select, white 5-8 = mute
-                if (pressed && index <= 7) {
-                    if (index <= 3) selectTrack(index);
-                    else            muteTrack(index - 4);
-                }
-                return; // shift swallows piano keys
-            }
-            if (m_state.mode == 1) {           // SEQUENCER mode
-                // Hold-to-edit gesture: press arms the step; toggling
-                // happens on RELEASE only if no encoder edit happened
-                // while held (Elektron-style hold-step + turn).
-                if (index <= 15) {
-                    const int step = m_window + index; // window-relative
-                    if (step >= m_pattern.length) return; // past pattern end
-                    if (pressed) {
-                        // Repeat-storm guard: a second down for an
-                        // already-held key must not reset the edit flag
-                        // (SimBackend filters SDL auto-repeat, but the
-                        // app is robust even if one leaks through).
-                        if (m_heldStep == index) return;
-                        m_heldStep = index;
-                        m_heldEdited = false;
-                    } else {
-                        if (m_heldStep == index) {
-                            if (!m_heldEdited)
-                                toggleStep(m_state.track, step);
-                            m_heldStep = -1;
-                        }
-                    }
-                } else if (pressed) {
-                    const int step =
-                        m_window + kBlackStepMap[index - kKeyBlack0];
-                    if (step < m_pattern.length) toggleAccent(step);
-                }
-            } else {                           // PLAY mode
-                playKey(index, pressed);
-            }
+            // rev B: the piano row is ALWAYS playable (MODE toggles
+            // scale-lock, not play/step). While a step is held, a piano
+            // tap p-locks that step's pitch (and sounds for feedback).
+            pianoKey(index, pressed);
             return;
         }
         if (!pressed) return;
@@ -488,6 +494,18 @@ public:
         // FX chooser: encoder 1 scrolls the list.
         if (m_state.chooserOpen) {
             if (index == 0) fxChooserScroll(delta);
+            return;
+        }
+        // Macro ASSIGN mode: turning a pageable encoder (1-4, SYNTH
+        // page) binds its parameter to the pending macro.
+        if (m_assignMacro >= 0) {
+            if (index <= 3 && m_state.page == 0 && m_encParam[index] >= 0)
+                macroBind(m_assignMacro, m_encParam[index]);
+            return; // other encoders do nothing while assigning
+        }
+        // Macro encoders 5-8 (HAL 4..7): relative edit, any page.
+        if (index >= 4) {
+            editMacro(index - 4, delta);
             return;
         }
         switch (m_state.page) {
@@ -569,7 +587,7 @@ public:
 
     void onAnalog(int index, float value) override {
         using namespace gb;
-        if (index >= kAnalogPot0 && index < kAnalogPot0 + 6) {
+        if (index >= kAnalogPot0 && index < kAnalogPot0 + 2) { // 2 pots
             potMove(index - kAnalogPot0, value);
         } else if (index == kAnalogSlider) {
             m_slider = value;
@@ -632,7 +650,7 @@ private:
 
     void setPage(int p) {
         if (p != m_state.page)          // real page change re-arms
-            for (int i = 0; i < 6; ++i) m_potEngaged[i] = false;
+            for (int i = 0; i < 2; ++i) m_potEngaged[i] = false;
         m_state.page = p;
         for (int i = 0; i < 4; ++i) {
             m_state.encLabels[i] = kPages[p].enc[i];
@@ -642,6 +660,16 @@ private:
     }
 
     void softKey(int i) {
+        // Macro ASSIGN modal: S1 = reset to factory ADSR, else cancel
+        if (m_assignMacro >= 0) {
+            const int slot = m_assignMacro;
+            if (i == 0) macroResetDefault(slot);
+            else {
+                m_assignMacro = -1;
+                toast("MACRO", "CANCEL");
+            }
+            return;
+        }
         // S3/S4 = TRK-/TRK+ on all pages EXCEPT SAMPLE (S3=NORM,
         // S4=ASSIGN there — no TRK on that page).
         if (i == 2 && m_state.page != 4) { trackCycle(-1); return; }
@@ -726,31 +754,22 @@ private:
 
     bool shiftHeld() const { return m_shiftL || m_shiftR; }
 
-    // Held-step edit (SEQ mode, T1): encoder 1 = per-step pitch
-    // (chromatic, C2..C6), encoder 2 = per-step gate (50..100%).
-    // Absolute step = window + held white-key index.
+    // Held-step edit (rev B): pitch comes from a piano tap (p-lock);
+    // encoders while held adjust per-step GATE (50..100%).
+    // Absolute step = window + held key index.
     void editHeldStep(int enc, int delta) {
+        (void)enc; // ENC1 = gate (any encoder drives gate while held)
         const int step = m_window + m_heldStep;
         auto& s = m_pattern.steps[0][step];
         m_heldEdited = true;
-        if (enc == 0) {
-            const int note = std::max(36, std::min(96,
-                m_pattern.t1Note + s.noteOffset + delta));
-            s.noteOffset = int8_t(note - m_pattern.t1Note);
-            char nb[8];
-            toast("NOTE", noteName(note, nb, sizeof(nb)));
-            std::printf("[seq] T1 step %02d note = %s(%d)\n",
-                        step, nb, note);
-        } else {
-            int g = s.gate > 0 ? s.gate
-                               : int(m_pattern.t1Gate * 100.0f + 0.5f);
-            g = std::max(50, std::min(100, g + delta * 5));
-            s.gate = uint8_t(g);
-            char vb[8];
-            std::snprintf(vb, sizeof(vb), "%d%%", g);
-            toast("GATE", vb);
-            std::printf("[seq] T1 step %02d gate = %d%%\n", step, g);
-        }
+        int g = s.gate > 0 ? s.gate
+                           : int(m_pattern.t1Gate * 100.0f + 0.5f);
+        g = std::max(50, std::min(100, g + delta * 5));
+        s.gate = uint8_t(g);
+        char vb[8];
+        std::snprintf(vb, sizeof(vb), "%d%%", g);
+        toast("GATE", vb);
+        std::printf("[seq] T1 step %02d gate = %d%%\n", step, g);
     }
 
     // Pattern length edit (SEQ S1 = LEN; any key exits).
@@ -832,12 +851,15 @@ private:
     void toggleMode() {
         if (m_nsr2) { // NSR-2: PLAY -> STEP -> TEXT -> PLAY
             m_state.mode = (m_state.mode + 1) % 3;
+            static const char* kModes[3] = {"PLAY", "SEQ", "TEXT"};
+            std::printf("[panel] MODE -> %s (keyboard row)\n",
+                        kModes[m_state.mode]);
         } else {
-            m_state.mode ^= 1;
+            // NSR-1 rev B: MODE toggles keyboard scale-lock
+            m_scaleLock = (m_scaleLock == 2) ? 0 : 2; // chromatic <-> major
+            toast("SCALE", scaleName());
+            std::printf("[panel] MODE -> scale-lock %s\n", scaleName());
         }
-        static const char* kModes[3] = {"PLAY", "SEQ", "TEXT"};
-        std::printf("[panel] MODE -> %s (keyboard row)\n",
-                    kModes[m_state.mode]);
     }
 
     // ── NSR-2 grid (0..31) ──────────────────────────────────────────
@@ -995,13 +1017,69 @@ private:
                     step, s.accent ? "ON" : "off");
     }
 
-    // ── Play mode ───────────────────────────────────────────────────
-    void playKey(int keyIndex, bool pressed) {
+    // ── NSR-1 rev B: piano row (always playable, scale-lockable) ────
+    void pianoKey(int keyIndex, bool pressed) {
         const int t = m_state.track;
-        const int note = (t == 0)
+        const int raw = (t == 0)
             ? m_baseNote + (keyIndex <= 15 ? kWhiteOffsets[keyIndex]
                                            : kBlackOffsets[keyIndex - 16])
             : m_pattern.noteForTrack(t);
+        const int note = snapToScale(raw, m_scaleLock);
+        // p-lock: held step + piano tap = set that step's pitch (T1)
+        if (pressed && m_heldStep >= 0 && t == 0) {
+            const int step = m_window + m_heldStep;
+            auto& s = m_pattern.steps[0][step];
+            s.noteOffset = int8_t(note - m_pattern.t1Note);
+            m_heldEdited = true;
+            char nb[8];
+            toast("NOTE", noteName(note, nb, sizeof(nb)));
+            std::printf("[seq] T1 step %02d p-lock %s(%d)\n", step, nb,
+                        note);
+        }
+        if (pressed && note != raw) {
+            char nb[8];
+            std::printf("[panel] scale-lock: raw %d -> %s\n", raw,
+                        noteName(note, nb, sizeof(nb)));
+        }
+        playKey(keyIndex, pressed, note);
+    }
+
+    // ── NSR-1 rev B: step row (always the sequencer) ────────────────
+    void onStepRowKey(int i, bool pressed) {
+        if (shiftHeld()) {
+            // shift+step 1-4 = select track, 5-8 = mute, 9-16 = accent
+            if (!pressed) return;
+            if (i <= 3)      selectTrack(i);
+            else if (i <= 7) muteTrack(i - 4);
+            else             toggleAccent(m_window + i);
+            return;
+        }
+        const int step = m_window + i;
+        if (step >= m_pattern.length) return;
+        // hold-to-edit: release toggles only if nothing was edited
+        if (pressed) {
+            if (m_heldStep == i) return; // repeat-storm guard
+            m_heldStep = i;
+            m_heldRow = -1;
+            m_heldEdited = false;
+        } else {
+            if (m_heldStep == i) {
+                if (!m_heldEdited) toggleStep(m_state.track, step);
+                m_heldStep = -1;
+            }
+        }
+    }
+
+    // ── Play mode ───────────────────────────────────────────────────
+    void playKey(int keyIndex, bool pressed, int noteOverride = -1) {
+        const int t = m_state.track;
+        const int note = noteOverride >= 0 ? noteOverride : (t == 0)
+            ? m_baseNote + (keyIndex <= 15 ? kWhiteOffsets[keyIndex]
+                                           : kBlackOffsets[keyIndex - 16])
+            : m_pattern.noteForTrack(t);
+        // white-key LEDs (rev B ch2 notes 16-31) mirror held notes
+        if (keyIndex <= 15) m_gridNoteHeld[keyIndex] = pressed;
+        if (pressed) m_lastGridNote = note;
         sendNote(t, note, pressed, pressed ? velocity7() : 0);
         if (pressed) {
             char nb[8];
@@ -1140,6 +1218,7 @@ private:
         }
         m_state.seqNote = m_pattern.t1Note;
         m_state.seqGatePct = int(m_pattern.t1Gate * 100.0f + 0.5f);
+        m_state.scaleLock = m_scaleLock;
         for (int s = 0; s < 16; ++s) {
             const int idx = m_window + s;
             const auto& st = m_pattern.steps[sel][idx];
@@ -1157,6 +1236,9 @@ private:
     // play mode = held notes, text mode = enter/backspace markers.
     void syncLeds(int ph) {
         if (!m_nsr2) {
+            // NSR-1 rev B: LEDs 0-15 = step row (selected track's window
+            // steps, playhead inverts); LEDs 16-31 = white keys (held
+            // notes).
             const int len = m_pattern.length;
             const int sel = m_state.track;
             for (int i = 0; i < 16; ++i) {
@@ -1165,6 +1247,7 @@ private:
                 const bool v = on != (i == ph);
                 m_state.leds[i] = v;
                 m_hal.setLed(i, v);
+                m_hal.setLed(16 + i, m_gridNoteHeld[i]);
             }
             return;
         }
@@ -1248,11 +1331,14 @@ private:
         std::snprintf(buf, n, "%.3g%s", double(v), pi.unit);
     }
 
-    // Pots (CUT RES A D S R) bind by name on the selected track.
-    static constexpr const char* kPotNames[6] =
-        {"cutoff", "reso", "attack", "decay", "sustain", "release"};
-    static constexpr const char* kPotLabel[6] =
-        {"CUT", "RES", "A", "D", "S", "R"};
+    // Pots (CUT RES) bind by name on the selected track. Rev B2: amp
+    // A/D/S/R moved to dedicated encoders 5-8 (relative, no pickup).
+    static constexpr const char* kPotNames[2] = {"cutoff", "reso"};
+    static constexpr const char* kPotLabel[2] = {"CUT", "RES"};
+    // Dedicated amp-ADSR encoders (HAL encoders 4..7).
+    static constexpr const char* kAdsrNames[4] =
+        {"attack", "decay", "sustain", "release"};
+    static constexpr const char* kAdsrLabel[4] = {"A", "D", "S", "R"};
 
     // ── Encoder param pages (built dynamically, pot-owned excluded) ──
     // Design rule: each parameter belongs to exactly ONE control. The
@@ -1273,12 +1359,15 @@ private:
             if (containsCI(name, kws[i])) return true;
         return false;
     }
-    // Pot ownership is INDEX-precise (the params the pots are actually
-    // bound to), not a loose name match — "Filt Attack" is NOT the
-    // amp-A pot's "Amp Attack".
-    bool isPotOwnedIndex(int pidx) const {
-        for (int i = 0; i < 6; ++i)
+    // Pot ownership is INDEX-precise: dedicated controls (2 pots + 4
+    // ADSR encoders) own the params they are bound to; pageable
+    // encoders never see them. "Filt Attack" is NOT the amp-A "Amp
+    // Attack".
+    bool isDedicatedIndex(int pidx) const {
+        for (int i = 0; i < 2; ++i)
             if (m_potParam[i] == pidx) return true;
+        for (int i = 0; i < 4; ++i)
+            if (m_adsrParam[i] == pidx) return true;
         return false;
     }
 
@@ -1295,18 +1384,18 @@ private:
             };
             for (int i = 0; i < n; ++i) {
                 const char* nm = inst->parameterInfo(i).name;
-                if (!isPotOwnedIndex(i) && nameHasAny(nm, kOscKw, 3))
+                if (!isDedicatedIndex(i) && nameHasAny(nm, kOscKw, 3))
                     claim(0, i);
             }
             for (int i = 0; i < n; ++i) {
                 const char* nm = inst->parameterInfo(i).name;
-                if (!isPotOwnedIndex(i) && !nameHasAny(nm, kOscKw, 3) &&
+                if (!isDedicatedIndex(i) && !nameHasAny(nm, kOscKw, 3) &&
                     nameHasAny(nm, kModKw, 4))
                     claim(1, i);
             }
             for (int i = 0; i < n; ++i) {
                 const char* nm = inst->parameterInfo(i).name;
-                if (!isPotOwnedIndex(i) && !nameHasAny(nm, kOscKw, 3) &&
+                if (!isDedicatedIndex(i) && !nameHasAny(nm, kOscKw, 3) &&
                     !nameHasAny(nm, kModKw, 4))
                     claim(2, i);
             }
@@ -1331,15 +1420,116 @@ private:
     }
 
     void rebindParams() {
-        for (int i = 0; i < 6; ++i) m_potParam[i] = findParam(kPotNames[i]);
-        for (int i = 0; i < 6; ++i) m_potEngaged[i] = false;
+        for (int i = 0; i < 2; ++i) m_potParam[i] = findParam(kPotNames[i]);
+        for (int i = 0; i < 2; ++i) m_potEngaged[i] = false;
+        for (int i = 0; i < 4; ++i)
+            m_adsrParam[i] = findParam(kAdsrNames[i]);
+        // macros: per-track assignment, factory = ADSR
+        for (int i = 0; i < 4; ++i) {
+            const int assigned = m_macroParamByTrack[m_state.track][i];
+            m_macroParam[i] = assigned >= 0 ? assigned : m_adsrParam[i];
+            updateMacroLabel(i);
+        }
         rebindEncoders();
+    }
+
+    // ── Macro encoders (HAL 4..7) ───────────────────────────────────
+    // Factory default: amp A/D/S/R of the selected track. Assignable:
+    // shift+push enters ASSIGN for that macro; the next param control
+    // touched (pageable encoder 1-4 on SYNTH, or a pot) binds its
+    // parameter; push again or 3 s timeout cancels; S1 while assigning
+    // resets to the factory ADSR binding. Bindings persist per track in
+    // settings.json. Edits are relative (1/64 detent, shift 1/256).
+    void editMacro(int slot, int delta) {
+        const int p = m_macroParam[slot];
+        if (p < 0) return; // inert (unbound, e.g. S/R on drum lanes)
+        auto* inst = selInstrument();
+        const auto& pi = inst->parameterInfo(p);
+        const float step = shiftHeld() ? delta / 256.0f : delta / 64.0f;
+        const float nv = std::max(0.0f, std::min(1.0f,
+            getNormParam(p) + step));
+        setNormParam(p, nv);
+        char vb[16];
+        formatParam(pi, nv, vb, sizeof(vb));
+        toastLow(pi.name, vb);
+        std::printf("[panel] ENC%d %s = %s\n", slot + 5, pi.name, vb);
+    }
+
+    void macroPushAssign(int slot) {
+        if (m_assignMacro == slot) { // push again = cancel
+            m_assignMacro = -1;
+            toast("MACRO", "CANCEL");
+            std::printf("[panel] macro %d assign cancelled\n", slot + 1);
+            return;
+        }
+        m_assignMacro = slot;
+        m_assignTime = std::chrono::steady_clock::now();
+        char vb[8];
+        std::snprintf(vb, sizeof(vb), "M%d", slot + 1);
+        toast("ASSIGN", vb);
+        std::printf("[panel] macro %d: ASSIGN — touch a param control "
+                    "(S1 = reset to ADSR)\n", slot + 1);
+    }
+
+    void macroBind(int slot, int pidx) {
+        auto* inst = selInstrument();
+        m_macroParamByTrack[m_state.track][slot] = pidx;
+        m_macroParam[slot] = pidx;
+        m_assignMacro = -1;
+        updateMacroLabel(slot);
+        const char* nm = (inst && pidx >= 0) ? inst->parameterInfo(pidx).name
+                                             : "?";
+        toast("MACRO", nm);
+        std::printf("[panel] macro %d <- %s (T%d)\n", slot + 1, nm,
+                    m_state.track + 1);
+        saveSettings();
+    }
+
+    void macroResetDefault(int slot) {
+        m_macroParamByTrack[m_state.track][slot] = -1; // factory
+        m_macroParam[slot] = m_adsrParam[slot];
+        m_assignMacro = -1;
+        updateMacroLabel(slot);
+        char vb[8];
+        std::snprintf(vb, sizeof(vb), "M%d", slot + 1);
+        toast("MACRO->ADSR", vb);
+        std::printf("[panel] macro %d reset to ADSR\n", slot + 1);
+        saveSettings();
+    }
+
+    void updateMacroLabel(int slot) {
+        auto* inst = selInstrument();
+        const int p = m_macroParam[slot];
+        if (inst && p >= 0 && m_macroParamByTrack[m_state.track][slot] >= 0)
+            std::snprintf(m_macroLabel[slot], sizeof(m_macroLabel[slot]),
+                          "%d:%.7s", slot + 5, inst->parameterInfo(p).name);
+        else
+            std::snprintf(m_macroLabel[slot], sizeof(m_macroLabel[slot]),
+                          "%d:%s", slot + 5, kAdsrLabel[slot]);
+    }
+
+    void macroTimeout() { // per-frame: 3 s assign timeout
+        if (m_assignMacro >= 0 &&
+            std::chrono::steady_clock::now() - m_assignTime >
+                std::chrono::seconds(3)) {
+            std::printf("[panel] macro %d assign timed out\n",
+                        m_assignMacro + 1);
+            m_assignMacro = -1;
+            toastLow("MACRO", "TIMEOUT");
+        }
     }
 
     // Pot move with soft pickup: disengaged pots only watch until the
     // physical position crosses the stored value; then they engage and
     // the param follows.
     void potMove(int pot, float value) {
+        // Macro ASSIGN: touching a pot binds its parameter
+        if (m_assignMacro >= 0) {
+            if (m_potParam[pot] >= 0)
+                macroBind(m_assignMacro, m_potParam[pot]);
+            m_potPrev[pot] = value;
+            return;
+        }
         const int p = m_potParam[pot];
         if (p < 0) { // unbound (e.g. drum tracks: CUT/RES/S/R)
             m_potPrev[pot] = value;
@@ -1719,6 +1909,15 @@ private:
         j["velSource"] = velSourceName();
         j["ledBrightness"] = m_ledBrightness;
         j["scale"] = scaleName();
+        // macro assignments, per track (-1 = factory ADSR default)
+        nlohmann::json mac;
+        for (int t = 0; t < 4; ++t) {
+            nlohmann::json arr = nlohmann::json::array();
+            for (int i = 0; i < 4; ++i)
+                arr.push_back(m_macroParamByTrack[t][i]);
+            mac[std::to_string(t)] = arr;
+        }
+        j["macros"] = mac;
         if (FILE* f = std::fopen("settings.json", "wb")) {
             const std::string s = j.dump(2);
             std::fwrite(s.data(), 1, s.size(), f);
@@ -1747,6 +1946,17 @@ private:
             m_ledBrightness = j.value("ledBrightness", 8);
             const std::string sc = j.value("scale", "CHROM");
             m_scaleLock = sc == "MAJOR" ? 0 : sc == "MINOR" ? 1 : 2;
+            if (j.contains("macros")) {
+                for (int t = 0; t < 4; ++t) {
+                    const auto& arr = j["macros"].value(
+                        std::to_string(t), nlohmann::json::array());
+                    if (arr.is_array())
+                        for (int i = 0; i < 4 && i < int(arr.size()); ++i)
+                            m_macroParamByTrack[t][i] =
+                                arr[i].get<int>();
+                }
+                rebindParams(); // refresh macro bindings/labels
+            }
             std::printf("[set] loaded settings.json (theme=%s vel=%s)\n",
                         th.c_str(), vs.c_str());
         } catch (...) {
@@ -1787,13 +1997,27 @@ private:
 
     // ── Param/FX sync (engine → UI, every frame) ────────────────────
     void syncParamsToUi() {
-        // pot rows: engine values; unbound (drums CUT/RES/S/R) → "—"
-        for (int i = 0; i < 6; ++i) {
+        // param rows: CUT/RES (pots) + A/D/S/R (engine ADSR values,
+        // informational — macros may be assigned elsewhere); unbound
+        // (drums CUT/RES/S/R) → "—"
+        for (int i = 0; i < 2; ++i) {
             m_state.params[i].name = kPotLabel[i];
             m_state.params[i].value =
                 m_potParam[i] >= 0
                     ? int(getNormParam(m_potParam[i]) * 127.0f + 0.5f)
                     : -1;
+        }
+        for (int i = 0; i < 4; ++i) {
+            m_state.params[2 + i].name = kAdsrLabel[i];
+            m_state.params[2 + i].value =
+                m_adsrParam[i] >= 0
+                    ? int(getNormParam(m_adsrParam[i]) * 127.0f + 0.5f)
+                    : -1;
+        }
+        // macro strip labels (encoders 5-8): ADSR short names or the
+        // assigned param's name
+        for (int i = 0; i < 4; ++i) {
+            m_state.macroLabels[i] = m_macroLabel[i];
         }
         // dynamic encoder labels
         if (m_state.page == 0) {
@@ -1862,7 +2086,9 @@ private:
         else if (m_testMode == 5) probeStep(t, once);
         else if (m_testMode == 6) paramtestStep(t, once);
         else if (m_testMode == 7) sampletestStep(t, once);
-        else                      nsr2testStep(t, once);
+        else if (m_testMode == 8) nsr2testStep(t, once);
+        else if (m_testMode == 9) revbtestStep(t, once);
+        else                      macrotestStep(t, once);
     }
 
     // --smoke: boot + notes on both engine tracks + frame per page.
@@ -1965,42 +2191,46 @@ private:
     // driven through the HAL event path (onKey/onEncoderDelta).
     template <typename Once>
     void uitestStep(double t, Once& once) {
+        // NSR-1 rev B: steps live on the step row (40-55), pitch via
+        // p-lock (hold step + piano tap), gate via hold + encoder.
+        using gb::kKeyStep0;
         if (t >= 0.3 && once(0)) {
-            std::printf("[uitest] SEQ mode; select T1 via shift+white1; "
-                        "toggle steps 0/3/7\n");
-            m_state.mode = 1; // SEQ mode
+            std::printf("[uitest] select T1 via shift+step1; "
+                        "toggle steps 0/3/7 on the step row\n");
             setPage(1);
             onKey(gb::kKeyShiftL, true);
-            onKey(0, true); onKey(0, false);
+            onKey(kKeyStep0 + 0, true); onKey(kKeyStep0 + 0, false);
             onKey(gb::kKeyShiftL, false);
-            for (int s : {0, 3, 7}) { onKey(s, true); onKey(s, false); }
+            for (int s : {0, 3, 7}) {
+                onKey(kKeyStep0 + s, true); onKey(kKeyStep0 + s, false);
+            }
         }
         if (t >= 0.6 && once(1)) {
-            std::printf("[uitest] hold step 3 + ENC1 x4 -> E4\n");
-            onKey(3, true);
-            for (int i = 0; i < 4; ++i) onEncoderDelta(0, +1);
-            dumpFrame("uitest_toast.rgb565"); // toast visible mid-edit
-            onKey(3, false);
+            std::printf("[uitest] hold step 3 + piano E4 -> p-lock\n");
+            onKey(kKeyStep0 + 3, true);        // hold step 3
+            onKey(2, true); onKey(2, false);   // piano white 3 = E4
+            dumpFrame("uitest_toast.rgb565");  // toast visible mid-edit
+            onKey(kKeyStep0 + 3, false);
         }
         if (t >= 0.9 && once(2)) {
-            std::printf("[uitest] hold step 7 + ENC1 x7 -> G4, "
-                        "ENC2 x3 -> gate 85%%\n");
-            onKey(7, true);
-            for (int i = 0; i < 7; ++i) onEncoderDelta(0, +1);
-            onEncoderDelta(1, +3); // 70% -> 85%
-            onKey(7, false);
+            std::printf("[uitest] hold step 7 + piano G4, ENC1 gate 85%%\n");
+            onKey(kKeyStep0 + 7, true);
+            onKey(4, true); onKey(4, false);   // piano white 5 = G4
+            onEncoderDelta(0, +3);             // gate 70% -> 85%
+            onKey(kKeyStep0 + 7, false);
         }
         if (t >= 1.1 && once(3)) { std::printf("[uitest] PLAY\n"); togglePlay(); }
         if (t >= 1.0 && once(9)) {
-            // Repeat-storm regression: toggle step 5 on, then hold it,
-            // edit pitch, interleave duplicate key-down events (an
-            // auto-repeat storm leaking past the backend), release.
-            // The edit must stick and the step must NOT toggle off.
-            onKey(5, true); onKey(5, false);          // toggle on
-            onKey(5, true);                            // hold
-            onEncoderDelta(0, +2);                     // +2 semitones
-            onKey(5, true); onKey(5, true); onKey(5, true); // storm
-            onKey(5, false);                           // release
+            // Repeat-storm regression on the step row: toggle step 5 on,
+            // hold it, edit pitch via p-lock, interleave duplicate
+            // key-down events, release. The edit must stick and the step
+            // must NOT toggle off.
+            onKey(kKeyStep0 + 5, true); onKey(kKeyStep0 + 5, false);
+            onKey(kKeyStep0 + 5, true);                       // hold
+            onKey(1, true); onKey(1, false);                  // p-lock D4
+            onKey(kKeyStep0 + 5, true); onKey(kKeyStep0 + 5, true);
+            onKey(kKeyStep0 + 5, true);                       // storm
+            onKey(kKeyStep0 + 5, false);                      // release
             const auto& st = m_pattern.steps[0][5];
             m_repeatOk = st.on && st.noteOffset == 2;
             std::printf("[uitest] repeat storm during hold: step5 on=%d "
@@ -2020,12 +2250,12 @@ private:
         if (t >= 2.4 && once(6)) {
             std::printf("[uitest] shift-mute T3 via HAL path\n");
             onKey(gb::kKeyShiftL, true);
-            onKey(6, true); onKey(6, false); // shift+white 7 -> mute T3
-            onKey(gb::kKeyShiftL, false);
+            onKey(gb::kKeyStep0 + 6, true); onKey(gb::kKeyStep0 + 6, false);
+            onKey(gb::kKeyShiftL, false);   // shift+step 7 -> mute T3
             m_muteOk = m_muted[2];
             onKey(gb::kKeyShiftL, true);
-            onKey(6, true); onKey(6, false); // toggle back
-            onKey(gb::kKeyShiftL, false);
+            onKey(gb::kKeyStep0 + 6, true); onKey(gb::kKeyStep0 + 6, false);
+            onKey(gb::kKeyShiftL, false);   // toggle back
             m_muteOk = m_muteOk && !m_muted[2];
         }
         if (t >= 2.6 && once(7)) stopTransport();
@@ -2049,7 +2279,7 @@ private:
         check(m_firedNote[7] == 67, "step 7 fired G4 (per-step pitch)");
         check(m_fires[0] >= 3, "T1 steps fired >= 3 times");
         check(m_trkOk, "TRK-/TRK+ cycle wraps (T1..T4->T1->T4->T3)");
-        check(m_muteOk, "shift+white7 mutes/unmutes T3");
+        check(m_muteOk, "shift+step7 mutes/unmutes T3");
         check(m_toastShown, "toast shown during hold-step edit");
         check(m_repeatOk, "repeat storm during hold: edit kept, no toggle");
         std::printf("[uitest] %d/%d assertions PASS\n", pass, pass + fail);
@@ -2069,20 +2299,21 @@ private:
             for (int i = 0; i < 8; ++i) onEncoderDelta(0, +1); // 16+8
             onKey(gb::kKeySoft4, true); onKey(gb::kKeySoft4, false); // exit
             m_lenOk = (m_pattern.length == 24) && !m_lenEdit;
-            // step 0 on page 1
-            onKey(0, true); onKey(0, false);
+            // step 0 on page 1 (step row key 1)
+            onKey(gb::kKeyStep0 + 0, true); onKey(gb::kKeyStep0 + 0, false);
             // shift+> to page 2 (manual window)
             onKey(gb::kKeyShiftL, true);
             onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false);
             onKey(gb::kKeyShiftL, false);
             m_windowOk = (m_window == 16) && !m_follow;
-            // step 20 = white 5 on page 2; accent via the black key
-            // left of white 5 (black index 19); pitch +4 (E4) via hold
-            onKey(4, true); onKey(4, false);   // toggle step 20 on
-            onKey(19, true); onKey(19, false); // accent step 20
-            onKey(4, true);                    // hold step 20
-            for (int i = 0; i < 4; ++i) onEncoderDelta(0, +1);
-            onKey(4, false);
+            // step 20 = step-row key 5 on page 2; accent via hold +
+            // SHIFT tap; pitch E4 via hold + piano tap (p-lock)
+            onKey(gb::kKeyStep0 + 4, true); onKey(gb::kKeyStep0 + 4, false);
+            onKey(gb::kKeyStep0 + 4, true);  // hold step 20
+            onKey(gb::kKeyShiftL, true);     // SHIFT tap = accent
+            onKey(gb::kKeyShiftL, false);
+            onKey(2, true); onKey(2, false); // piano white 3 = E4 p-lock
+            onKey(gb::kKeyStep0 + 4, false); // release (edited, no toggle)
         }
         if (t >= 0.9 && once(1)) {
             std::printf("[longtest] PLAY @ 120 BPM\n");
@@ -2198,7 +2429,16 @@ private:
             pushWheel(ex * 4, ey * 4, +1);
             pushWheel(ex * 4, ey * 4, +1);
         }
-        if (t >= 1.8 && once(4)) {
+        // NSR-1 rev B: click step-row key 1 ((45.5,156.5)mm) = step
+        // toggle on T1 (key index 40)
+        if (t >= 1.8 && once(4) && !m_nsr2) {
+            std::printf("[probe] click step-row key 1\n");
+            pushButton(45.5f * 4, 156.5f * 4, true);
+            pushButton(45.5f * 4, 156.5f * 4, false);
+        }
+        if (t >= 2.0 && once(5)) {
+            if (!m_nsr2)
+                m_probeStepOk = m_pattern.steps[0][0].on;
             std::printf("[probe] done — asserting\n");
             m_running = false;
         }
@@ -2221,6 +2461,8 @@ private:
         // ENC3 on the OSC page = Osc2 Wave (norm default 0.25)
         check(std::fabs(getNormParam(m_encParam[2]) - 0.25f) > 0.05f,
               "wheel over ENC3 -> encoder delta");
+        if (!m_nsr2)
+            check(m_probeStepOk, "click step-row key -> step toggles on");
         std::printf("[probe] %d/%d assertions PASS\n", pass, pass + fail);
         return fail == 0 ? 0 : 1;
     }
@@ -2230,10 +2472,10 @@ private:
     template <typename Once>
     void paramtestStep(double t, Once& once) {
         if (t >= 0.3 && once(0)) {
-            std::printf("[paramtest] select T1 (shift+white1) — pickup "
+            std::printf("[paramtest] select T1 (shift+step1) — pickup "
                         "re-arms\n");
             onKey(gb::kKeyShiftL, true);
-            onKey(0, true); onKey(0, false);
+            onKey(gb::kKeyStep0 + 0, true); onKey(gb::kKeyStep0 + 0, false);
             onKey(gb::kKeyShiftL, false);
             // sweep CUT pot 0.0 -> 0.6 in small steps: param must NOT
             // move (stored = 87/127 ≈ 0.685 from boot)
@@ -2277,34 +2519,53 @@ private:
         if (t >= 1.2 && once(4)) softKey(1); // PG+ -> osc param page
         if (t >= 1.3 && once(9)) dumpFrame("paramtest_p2.rgb565");
         if (t >= 1.35 && once(10)) {
-            // Exclusion sweep: turn ALL encoders on ALL pages — no
-            // pot-owned parameter may change.
-            float before[6];
-            for (int i = 0; i < 6; ++i)
-                before[i] = m_potParam[i] >= 0 ? getNormParam(m_potParam[i])
-                                               : -1.0f;
+            // Exclusion sweep (rev B2): turn ALL 4 pageable encoders on
+            // ALL pages — no dedicated-control parameter (pots CUT/RES,
+            // macro ADSR defaults) may change.
+            float beforeCut = getNormParam(m_potParam[0]);
+            float beforeRes = getNormParam(m_potParam[1]);
+            float beforeAdsr[4];
+            for (int i = 0; i < 4; ++i)
+                beforeAdsr[i] = m_adsrParam[i] >= 0
+                                    ? getNormParam(m_adsrParam[i]) : -1.0f;
             for (int p = 0; p < 3; ++p) {
                 for (int e = 0; e < 4; ++e) onEncoderDelta(e, +2);
                 softKey(1);
             }
-            bool same = true;
-            for (int i = 0; i < 6; ++i)
-                if (m_potParam[i] >= 0 &&
-                    std::fabs(getNormParam(m_potParam[i]) - before[i]) >
+            bool same = std::fabs(getNormParam(m_potParam[0]) - beforeCut) < 1e-4f &&
+                        std::fabs(getNormParam(m_potParam[1]) - beforeRes) < 1e-4f;
+            for (int i = 0; i < 4; ++i)
+                if (m_adsrParam[i] >= 0 &&
+                    std::fabs(getNormParam(m_adsrParam[i]) - beforeAdsr[i]) >
                         1e-4f)
                     same = false;
             m_ptOk[8] = same;
             m_ptOk[9] = m_encPages[0].count == 4 &&
                         m_encPages[1].count == 4;
-            std::printf("[paramtest] encoder sweep: pot params %s; "
+            std::printf("[paramtest] encoder sweep: dedicated params %s; "
                         "OSC=%d MOD=%d MISC=%d\n", same ? "untouched" : "MOVED",
                         m_encPages[0].count, m_encPages[1].count,
                         m_encPages[2].count);
         }
+        if (t >= 1.4 && once(12)) {
+            // ADSR macro defaults: encoder 5 edits amp attack (relative,
+            // no pickup); shift = fine (1/256)
+            const float b4 = getNormParam(m_adsrParam[0]);
+            onEncoderDelta(4, +4); // 4/64 = 0.0625
+            const float a4 = getNormParam(m_adsrParam[0]);
+            onKey(gb::kKeyShiftL, true);
+            onEncoderDelta(4, +1); // 1/256 fine
+            onKey(gb::kKeyShiftL, false);
+            const float f4 = getNormParam(m_adsrParam[0]);
+            m_ptOk[11] = (a4 - b4) > 0.04f && (a4 - b4) < 0.09f &&
+                         (f4 - a4) > 0.001f && (f4 - a4) < 0.01f;
+            std::printf("[paramtest] ADSR enc5: %.3f -> %.3f -> %.3f\n",
+                        double(b4), double(a4), double(f4));
+        }
         if (t >= 1.4 && once(5)) {
             std::printf("[paramtest] FX: select T2, page -> FX, chooser\n");
             onKey(gb::kKeyShiftL, true);
-            onKey(1, true); onKey(1, false); // shift+white 2 = T2
+            onKey(gb::kKeyStep0 + 1, true); onKey(gb::kKeyStep0 + 1, false); // shift+step 2 = T2
             onKey(gb::kKeyShiftL, false);
             onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false); // 0->1
             onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false); // 1->2
@@ -2328,11 +2589,8 @@ private:
             dumpFrame("paramtest_fx.rgb565");
         }
         if (t >= 1.8 && once(7)) {
-            // drum-track pots: A maps to Pad Attack — sweep the pot
-            // down through the target to engage pickup, then up
-            onAnalog(gb::kAnalogPot0 + 2, 0.9f);
-            onAnalog(gb::kAnalogPot0 + 2, 0.0f); // crosses target ~0
-            onAnalog(gb::kAnalogPot0 + 2, 0.5f); // engaged -> attack ~1s
+            // drum-track macros: ENC5 (macro 1, factory = Pad Attack)
+            onEncoderDelta(4, +8); // +8/64 = 0.125 norm
             auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
                 m_engine->instrument(1));
             m_ptOk[7] = rack && rack->getParameter(5) > 0.01f;
@@ -2377,10 +2635,11 @@ private:
         check(m_ptOk[4], "shift+encoder = fine step (~1/128)");
         check(m_ptOk[5], "FX chooser loads Reverb on T2");
         check(m_ptOk[6], "encoder edits FX param 0");
-        check(m_ptOk[7], "drum track: A pot maps to Pad Attack");
-        check(m_ptOk[8], "encoders never touch pot-owned params");
+        check(m_ptOk[7], "drum track: ENC5 (macro 1) maps to Pad Attack");
+        check(m_ptOk[8], "page encoders never touch dedicated params");
         check(m_ptOk[9], "SubSynth OSC+MOD pages have 4 params each");
         check(m_ptOk[10], "drum: empty pages skipped (MISC only)");
+        check(m_ptOk[11], "ADSR macro edit + shift-fine (default bind)");
         std::printf("[paramtest] %d/%d assertions PASS\n", pass, pass + fail);
         return fail == 0 ? 0 : 1;
     }
@@ -2392,7 +2651,7 @@ private:
         if (t >= 0.3 && once(0)) {
             std::printf("[sampletest] T2, page -> SAMPLE (4x >)\n");
             onKey(gb::kKeyShiftL, true);
-            onKey(1, true); onKey(1, false); // shift+white 2 = T2
+            onKey(gb::kKeyStep0 + 1, true); onKey(gb::kKeyStep0 + 1, false); // shift+step 2 = T2
             onKey(gb::kKeyShiftL, false);
             for (int i = 0; i < 4; ++i) {
                 onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false);
@@ -2586,6 +2845,184 @@ private:
         return fail == 0 ? 0 : 1;
     }
 
+    // --revbtest: NSR-1 rev B semantics — step row, p-lock, accent,
+    // shift+step select/mute, scale lock, 32-LED path.
+    template <typename Once>
+    void revbtestStep(double t, Once& once) {
+        using gb::kKeyStep0;
+        using gb::kKeyShiftL;
+        if (t >= 0.3 && once(0)) {
+            std::printf("[revbtest] step row toggles steps 0/3 on T1\n");
+            onKey(kKeyStep0 + 0, true); onKey(kKeyStep0 + 0, false);
+            onKey(kKeyStep0 + 3, true); onKey(kKeyStep0 + 3, false);
+            m_rbOk[0] = m_pattern.steps[0][0].on && m_pattern.steps[0][3].on;
+        }
+        if (t >= 0.5 && once(1)) {
+            std::printf("[revbtest] p-lock: hold step 3, tap piano E4\n");
+            onKey(kKeyStep0 + 3, true);   // hold step 3
+            onKey(2, true);               // piano white 3 = E4 (also sounds)
+            onKey(2, false);
+            dumpFrame("revbtest_plock.rgb565"); // toast visible
+            onKey(kKeyStep0 + 3, false);  // release (no toggle — edited)
+            m_rbOk[1] = m_pattern.steps[0][3].on &&
+                        m_pattern.steps[0][3].noteOffset == 4;
+            std::printf("[revbtest] step 3 noteOffset=%d (want +4)\n",
+                        int(m_pattern.steps[0][3].noteOffset));
+        }
+        if (t >= 0.7 && once(2)) {
+            std::printf("[revbtest] accent: step 9 on, then shift+step 9\n");
+            onKey(kKeyStep0 + 9, true); onKey(kKeyStep0 + 9, false);
+            onKey(kKeyShiftL, true);
+            onKey(kKeyStep0 + 9, true); onKey(kKeyStep0 + 9, false);
+            onKey(kKeyShiftL, false);
+            m_rbOk[2] = m_pattern.steps[0][9].accent;
+        }
+        if (t >= 0.9 && once(3)) {
+            std::printf("[revbtest] shift+step select T2 + mute T1\n");
+            onKey(kKeyShiftL, true);
+            onKey(kKeyStep0 + 1, true); onKey(kKeyStep0 + 1, false); // T2
+            onKey(kKeyStep0 + 4, true); onKey(kKeyStep0 + 4, false); // mute T1
+            onKey(kKeyShiftL, false);
+            m_rbOk[3] = m_state.track == 1 && m_muted[0];
+            onKey(kKeyShiftL, true);
+            onKey(kKeyStep0 + 4, true); onKey(kKeyStep0 + 4, false); // unmute
+            onKey(kKeyShiftL, false);
+            m_rbOk[3] = m_rbOk[3] && !m_muted[0];
+            selectTrack(0);
+        }
+        if (t >= 1.1 && once(4)) {
+            std::printf("[revbtest] MODE -> scale-lock MAJOR, C# snaps\n");
+            onKey(gb::kKeyMode, true); onKey(gb::kKeyMode, false);
+            onKey(16, true); onKey(16, false); // black 16 = C#4 (61)
+            m_rbOk[4] = m_scaleLock == 0 && m_lastGridNote == 62;
+            std::printf("[revbtest] C#4(61) -> %d (want 62/D4)\n",
+                        m_lastGridNote);
+            onKey(gb::kKeyMode, true); onKey(gb::kKeyMode, false); // back
+        }
+        if (t >= 1.3 && once(5)) {
+            m_rbOk[5] = m_hal.ledMaxIndex() >= 31;
+            std::printf("[revbtest] led max index = %d\n",
+                        m_hal.ledMaxIndex());
+            std::printf("[revbtest] done — asserting\n");
+            m_running = false;
+        }
+    }
+
+    int revbtestVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[revbtest] ASSERT %-46s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_rbOk[0], "step row toggles steps on selected track");
+        check(m_rbOk[1], "hold step + piano tap = p-lock pitch (E4)");
+        check(m_rbOk[2], "shift+step 9 toggles accent");
+        check(m_rbOk[3], "shift+step 2 selects T2, shift+step 5 mutes T1");
+        check(m_rbOk[4], "MODE scale-lock: C#4 snaps to D4 in major");
+        check(m_rbOk[5], "32-LED path exercised (index >= 31)");
+        std::printf("[revbtest] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
+    // --macrotest: macro encoder assign/bind/reset/persist flow.
+    template <typename Once>
+    void macrotestStep(double t, Once& once) {
+        if (t >= 0.3 && once(0)) {
+            // fresh settings: no macros key -> factory ADSR defaults
+            std::remove("settings.json");
+            m_mcOk[5] = true;
+            for (int i = 0; i < 4; ++i)
+                m_mcOk[5] = m_mcOk[5] && m_macroParam[i] == m_adsrParam[i];
+            std::printf("[macrotest] fresh defaults: macros = ADSR: %s\n",
+                        m_mcOk[5] ? "yes" : "NO");
+        }
+        if (t >= 0.5 && once(1)) {
+            // assign macro 1 (ENC5) to the OSC page's encoder-1 param
+            std::printf("[macrotest] shift+push ENC5 -> assign\n");
+            onKey(gb::kKeyShiftL, true);
+            onEncoderPush(4, true); onEncoderPush(4, false);
+            onKey(gb::kKeyShiftL, false);
+            m_mcOk[0] = (m_assignMacro == 0) && m_state.toastActive;
+            onEncoderDelta(0, +1); // bind: OSC page encoder 1 param
+            m_mcOk[1] = m_assignMacro < 0 &&
+                        m_macroParam[0] == m_encParam[0];
+            std::printf("[macrotest] macro 1 bound to param %d\n",
+                        m_macroParam[0]);
+        }
+        if (t >= 0.7 && once(2)) {
+            // ENC5 now edits the bound param (relative + toast)
+            const float before = getNormParam(m_macroParam[0]);
+            onEncoderDelta(4, +4); // +4/64
+            const float after = getNormParam(m_macroParam[0]);
+            m_mcOk[2] = (after - before) > 0.04f && (after - before) < 0.09f;
+            std::printf("[macrotest] ENC5 edit: %.3f -> %.3f\n",
+                        double(before), double(after));
+        }
+        if (t >= 0.9 && once(3)) {
+            // reset path: shift+push ENC5 -> assign, S1 -> factory ADSR
+            onKey(gb::kKeyShiftL, true);
+            onEncoderPush(4, true); onEncoderPush(4, false);
+            onKey(gb::kKeyShiftL, false);
+            softKey(0); // S1 while assigning = reset to ADSR
+            m_mcOk[3] = m_assignMacro < 0 &&
+                        m_macroParam[0] == m_adsrParam[0];
+            std::printf("[macrotest] macro 1 reset to ADSR: %s\n",
+                        m_mcOk[3] ? "yes" : "NO");
+        }
+        if (t >= 1.1 && once(4)) {
+            // cancel path: enter assign, push again = cancel
+            onKey(gb::kKeyShiftL, true);
+            onEncoderPush(4, true); onEncoderPush(4, false);
+            onKey(gb::kKeyShiftL, false);
+            const bool entered = m_assignMacro == 0;
+            onEncoderPush(4, true); onEncoderPush(4, false);
+            m_mcOk[4] = entered && m_assignMacro < 0 &&
+                        m_macroParam[0] == m_adsrParam[0];
+            std::printf("[macrotest] push-again cancel: %s\n",
+                        m_mcOk[4] ? "yes" : "NO");
+        }
+        if (t >= 1.3 && once(5)) {
+            // persistence round-trip: bind macro 2 to OSC enc-2 param,
+            // save happens on assign; wipe in-memory, reload from file
+            onKey(gb::kKeyShiftL, true);
+            onEncoderPush(5, true); onEncoderPush(5, false);
+            onKey(gb::kKeyShiftL, false);
+            onEncoderDelta(1, +1); // bind macro 2 -> OSC page enc 2
+            const int bound = m_macroParam[1];
+            for (int t2 = 0; t2 < 4; ++t2)
+                for (int i = 0; i < 4; ++i)
+                    m_macroParamByTrack[t2][i] = -1; // wipe
+            loadSettings();
+            m_mcOk[5] = m_macroParamByTrack[m_state.track][1] == bound &&
+                        m_macroParam[1] == bound;
+            std::printf("[macrotest] persist round-trip: bound=%d "
+                        "restored=%d\n", bound, m_macroParam[1]);
+        }
+        if (t >= 1.5 && once(6)) {
+            dumpFrame("macrotest.rgb565");
+            std::printf("[macrotest] done — asserting\n");
+            m_running = false;
+        }
+    }
+
+    int macrotestVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[macrotest] ASSERT %-46s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_mcOk[0], "shift+push ENC5 enters ASSIGN (toast)");
+        check(m_mcOk[1], "next param touch binds macro 1");
+        check(m_mcOk[2], "ENC5 edits bound param (relative + toast)");
+        check(m_mcOk[3], "S1 while assigning resets to factory ADSR");
+        check(m_mcOk[4], "push again cancels assign");
+        check(m_mcOk[5], "settings.json persist round-trip + defaults");
+        std::printf("[macrotest] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
     int seqtestVerdict() const {
         int pass = 0, fail = 0;
         auto check = [&](bool ok, const char* what) {
@@ -2657,9 +3094,16 @@ private:
     bool m_assigned = false, m_browserLoaded = false;
 
     // parameter bindings (M2b)
-    int m_potParam[6] = {-1, -1, -1, -1, -1, -1};
-    bool m_potEngaged[6] = {};
-    float m_potPrev[6] = {};
+    int m_potParam[2] = {-1, -1};
+    bool m_potEngaged[2] = {};
+    float m_potPrev[2] = {};
+    int m_adsrParam[4] = {-1, -1, -1, -1}; // factory ADSR bindings
+    // Macro encoders (5-8): per-track assignment (-1 = factory ADSR)
+    int m_macroParamByTrack[4][4] = {};
+    int m_macroParam[4] = {-1, -1, -1, -1}; // resolved for sel track
+    char m_macroLabel[4][10] = {};
+    int m_assignMacro = -1;
+    std::chrono::steady_clock::time_point m_assignTime{};
     EncPage m_encPages[3];
     int m_encParam[4] = {-1, -1, -1, -1};
     int m_paramPage = 0;
@@ -2720,9 +3164,12 @@ private:
     bool m_shrinkOk = false, m_followOk = false;
     bool m_repeatOk = false;
     int m_probeNotes = 0;
-    bool m_ptOk[11] = {}; // paramtest assertions
+    bool m_probeStepOk = false;
+    bool m_ptOk[12] = {}; // paramtest assertions
     bool m_stOk[8] = {};  // sampletest assertions
     bool m_n2Ok[6] = {};  // nsr2test assertions
+    bool m_rbOk[6] = {};  // revbtest assertions
+    bool m_mcOk[6] = {};  // macrotest assertions
     int m_lastGridNote = -1;
 };
 
@@ -2741,9 +3188,8 @@ bool writePanelDumpPng(const char* path, gb::PanelProfile profile) {
     gb::PanelState ps;
     ps.keyDown[gb::kKeyPlay] = true;          // PLAY held
     ps.keyDown[gb::kKeyWhite0 + 4] = true;    // white 5 held
-    const float pots[6] = {87.f / 127.f, 41.f / 127.f, 3.f / 127.f,
-                           55.f / 127.f, 70.f / 127.f, 24.f / 127.f};
-    for (int i = 0; i < 6; ++i) ps.pots[i] = pots[i];
+    const float pots[2] = {87.f / 127.f, 41.f / 127.f};
+    for (int i = 0; i < 2; ++i) ps.pots[i] = pots[i];
     ps.slider = 0.8f;
     ps.joyX = 0.3f; ps.joyY = 0.2f;
     for (int i = 0; i < gb::kMaxLeds; i += 4) ps.leds[i] = true;
@@ -2881,6 +3327,8 @@ int main(int argc, char** argv) {
         if (std::strcmp(argv[i], "--paramtest") == 0)  testMode = 6;
         if (std::strcmp(argv[i], "--sampletest") == 0) testMode = 7;
         if (std::strcmp(argv[i], "--nsr2test") == 0)   testMode = 8;
+        if (std::strcmp(argv[i], "--revbtest") == 0)   testMode = 9;
+        if (std::strcmp(argv[i], "--macrotest") == 0)  testMode = 10;
     }
     App app;
     app.setPanelProfile(panel);

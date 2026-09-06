@@ -47,7 +47,7 @@ bool SimBackend::init(HalHandler& handler) {
     SDL_SetTextureScaleMode(m_panelTexture, SDL_SCALEMODE_NEAREST);
     m_panelFb.resize(size_t(pw) * ph, 0);
     // panel mirror starts from the simulated analog defaults
-    for (int i = 0; i < 6; ++i) m_panel.pots[i] = m_pots[i];
+    for (int i = 0; i < 2; ++i) m_panel.pots[i] = m_pots[i];
     m_panel.slider = m_slider;
     printLegend();
     return true;
@@ -81,8 +81,9 @@ void SimBackend::printLegend() const {
         "[sim]                   everywhere; SYNTH: S1=OCT-(shift OCT+),\n"
         "[sim]                   S2=PG+ param pages OSC/MOD/MISC; MIXER:\n"
         "[sim]                   S1=MUTE selected; FX: S1=LOAD S2=BYP)\n"
-        "[sim] ownership   : 6 pots own filter/amp params (cut/res/ADSR);\n"
-        "[sim]                   encoders own everything else (no overlap)\n"
+        "[sim] ownership   : 2 pots own CUT/RES; encoders 5-8 = macros\n"
+        "[sim]                   (default amp ADSR; shift+push = assign,\n"
+        "[sim]                   touch param to bind, S1 = factory reset)\n"
         "[sim] shift layer : hold Shift + white 1-4 = select track,\n"
         "[sim]                   + white 5-8 = mute track; shift+</> = BPM\n"
         "[sim]                   (SEQ page: page the 16-step window)\n"
@@ -92,7 +93,7 @@ void SimBackend::printLegend() const {
         "[sim] SEQ page    : S1=LEN (ENC1 = 1..256, any key exits),\n"
         "[sim]                   shift+S1=CLR, S2=4FLR\n"
         "[sim] encoders    : wheel column left->right = ENC 1-4 (footer)\n"
-        "[sim] pots (kbd)  : F5..F10 select pot 1-6, -/= adjust\n"
+        "[sim] pots (kbd)  : F5/F6 = CUT/RES, -/= adjust\n"
         "[sim] slider(kbd) : [ and ] (velocity)\n"
         "[sim] joystick    : screen view: hold right mouse button + drag\n"
         "[sim] view/theme : F11 = panel/screen view, F12 = theme MONO/RED/GREEN\n"
@@ -325,7 +326,7 @@ void SimBackend::poll() {
                 break;
             }
             // pot / slider simulation (repeat allowed for adjustment)
-            if (down && sc >= SDL_SCANCODE_F5 && sc <= SDL_SCANCODE_F10) {
+            if (down && sc >= SDL_SCANCODE_F5 && sc <= SDL_SCANCODE_F6) {
                 m_selectedPot = int(sc - SDL_SCANCODE_F5);
                 std::printf("[sim] pot %d selected (%.2f)\n",
                             m_selectedPot + 1, double(m_pots[m_selectedPot]));
@@ -400,7 +401,7 @@ void SimBackend::poll() {
 
 void SimBackend::presentFrame(const uint16_t* rgb565) {
     // mirror HAL-side state into the panel model
-    for (int i = 0; i < 6; ++i) m_panel.pots[i] = m_pots[i];
+    for (int i = 0; i < 2; ++i) m_panel.pots[i] = m_pots[i];
     m_panel.slider = m_slider;
     m_panel.joyX = m_joyX;
     m_panel.joyY = m_joyY;

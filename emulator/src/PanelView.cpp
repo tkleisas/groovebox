@@ -46,8 +46,10 @@ constexpr RectMm kScreenInner = {11, 13, 88, 59};
 constexpr float kSoftX = 108, kSoftY[4] = {14, 29, 44, 59};
 constexpr RectMm kSoftBtn = {0, 0, 14, 11};
 constexpr float kEncCx[4] = {20, 45, 70, 95}, kEncCy = 88, kEncR = 7;
-constexpr float kPotCx[6] = {140, 158, 176, 192, 208, 224};
+// rev B2: 2 filter pots + 4 dedicated amp-ADSR encoders (same strip)
+constexpr float kPotCx[2] = {140, 158};
 constexpr float kPotCy = 32, kPotR = 6;
+constexpr float kAdsrCx[4] = {184, 202, 220, 238}; // encoders 4..7
 constexpr RectMm kTransport[3] = {{310, 14, 15, 10}, {327, 14, 15, 10},
                                   {344, 14, 15, 10}};
 constexpr RectMm kNav[3] = {{310, 34, 16, 9}, {328, 34, 16, 9},
@@ -56,6 +58,7 @@ constexpr RectMm kSliderTrack = {310, 85, 62, 6};
 constexpr float kSliderCapW = 13, kSliderCapH = 11;
 constexpr float kJoyCx = 18, kJoyCy = 105, kJoyR = 10, kJoyKnobR = 4.5f;
 constexpr float kKbX = 36, kWhiteY = 125, kBlackY = 105;
+constexpr float kStepY = 147;  // rev B step row, aligned with whites
 constexpr float kPitch = 19.05f, kCapMm = 18.1f;
 constexpr RectMm kShiftL = {kKbX - 27, kWhiteY + 0.5f, 20, kCapMm};
 constexpr RectMm kShiftR = {kKbX + 16 * kPitch + 7, kWhiteY + 0.5f, 20,
@@ -145,6 +148,11 @@ PanelView::Hit PanelView::hitTest(int x, int y) {
             return {kHitKey, kKeyWhite0 + i};
     if (inRect(x, y, kShiftL)) return {kHitKey, kKeyShiftL};
     if (inRect(x, y, kShiftR)) return {kHitKey, kKeyShiftR};
+    // rev B step row (keys 40-55), aligned with the whites below them
+    for (int i = 0; i < 16; ++i)
+        if (inRect(x, y, {kKbX + 0.5f + i * kPitch, kStepY + 0.5f,
+                          kCapMm, kCapMm}))
+            return {kHitKey, kKeyStep0 + i};
     for (int i = 0; i < 4; ++i)
         if (inRect(x, y, {kSoftX, kSoftY[i], kSoftBtn.w, kSoftBtn.h}))
             return {kHitKey, kKeySoft1 + i};
@@ -153,8 +161,11 @@ PanelView::Hit PanelView::hitTest(int x, int y) {
     if (inRect(x, y, kNav[0])) return {kHitKey, kKeyMode};
     if (inRect(x, y, kNav[1])) return {kHitKey, kKeyPrev};
     if (inRect(x, y, kNav[2])) return {kHitKey, kKeyNext};
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 2; ++i)
         if (inCircle(x, y, kPotCx[i], kPotCy, kPotR)) return {kHitPot, i};
+    for (int i = 0; i < 4; ++i)
+        if (inCircle(x, y, kAdsrCx[i], kPotCy, kPotR))
+            return {kHitEncoder, 4 + i}; // ADSR encoders 5-8
     for (int i = 0; i < 4; ++i)
         if (inCircle(x, y, kEncCx[i], kEncCy, kEncR))
             return {kHitEncoder, i};
@@ -221,13 +232,18 @@ void PanelView::render(Canvas565& c, Font5x7& font, const PanelState& st,
              (actEnc && st.activeIndex == i) || st.encoderPush[i],
              nullptr);
 
-    // pots: filter + amp envelope
+    // rev B2: 2 filter pots + 4 amp-ADSR encoders (relative, tick only)
     sectionLabel(c, font, 136, 17, "FILTER");
-    sectionLabel(c, font, 172, 17, "AMP ENVELOPE");
-    static const char* kPotLbl[6] = {"CUT", "RES", "A", "D", "S", "R"};
-    for (int i = 0; i < 6; ++i)
+    sectionLabel(c, font, 184, 17, "AMP ENVELOPE");
+    static const char* kPotLbl[2] = {"CUT", "RES"};
+    for (int i = 0; i < 2; ++i)
         knob(c, font, kPotCx[i], kPotCy, kPotR, st.pots[i], false,
              actPot && st.activeIndex == i, kPotLbl[i]);
+    static const char* kAdsrLbl[4] = {"A", "D", "S", "R"};
+    for (int i = 0; i < 4; ++i)
+        knob(c, font, kAdsrCx[i], kPotCy, kPotR, 0.0f, true,
+             (actEnc && st.activeIndex == 4 + i) || st.encoderPush[4 + i],
+             kAdsrLbl[i]);
 
     // transport + mode/nav
     sectionLabel(c, font, 310, 9, "TRANSPORT");
@@ -297,9 +313,9 @@ void PanelView::render(Canvas565& c, Font5x7& font, const PanelState& st,
         c.fill(mm(kx), mm(kWhiteY + 0.5f), mm(kCapMm), mm(kCapMm), cap);
         c.frame(mm(kx), mm(kWhiteY + 0.5f), mm(kCapMm), mm(kCapMm),
                 actKey && st.activeIndex == i ? kActive : kBtnEdge);
-        // LED dot (top center of the cap)
+        // LED dot (top center of the cap) — rev B: notes 16-31 = whites
         fillCircle(c, mm(kx + 9.55f), mm(kWhiteY + 3.0f), 3 * S / 2,
-                   st.leds[i] ? kLedOn : kLedOff);
+                   st.leds[16 + i] ? kLedOn : kLedOff);
         // key number
         char nb[4];
         std::snprintf(nb, sizeof(nb), "%d", i + 1);
@@ -318,9 +334,29 @@ void PanelView::render(Canvas565& c, Font5x7& font, const PanelState& st,
                                                            : kBtnEdge);
     }
 
+    // rev B: dedicated step row under the piano (dark caps, per-key
+    // LEDs = notes 0-15), aligned with the white keys above
+    sectionLabel(c, font, 370, 152, "STEPS");
+    for (int i = 0; i < 16; ++i) {
+        const float kx = kKbX + 0.5f + i * kPitch;
+        const bool down = st.keyDown[kKeyStep0 + i];
+        c.fill(mm(kx), mm(kStepY + 0.5f), mm(kCapMm), mm(kCapMm),
+               down ? rgb(80, 76, 70) : rgb(32, 30, 36));
+        c.frame(mm(kx), mm(kStepY + 0.5f), mm(kCapMm), mm(kCapMm),
+                actKey && st.activeIndex == kKeyStep0 + i ? kActive
+                                                          : kBtnEdge);
+        fillCircle(c, mm(kx + 9.55f), mm(kStepY + 3.0f), 3 * S / 2,
+                   st.leds[i] ? kLedOn : kLedOff);
+        char nb[4];
+        std::snprintf(nb, sizeof(nb), "%d", i + 1);
+        const int tw = Canvas565::textWidth(nb, 2);
+        c.text(font, mm(kx + 9.55f) - tw / 2, mm(kStepY + 10.0f), 2, nb,
+               rgb(120, 116, 122));
+    }
+
     // caption
     c.text(font, 8, kH - 20, 2,
-           "GROOVEBOX SIM - panel 400x150mm @ 4px/mm - F11 screen view",
+           "GROOVEBOX SIM - panel 400x170mm @ 4px/mm - F11 screen view",
            kLabelDim);
 }
 

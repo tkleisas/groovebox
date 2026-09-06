@@ -1,0 +1,13 @@
+[1/9] Performing build step for 'ELF2UF2Build'
+ninja: no work to do.
+[2/9] Performing build step for 'PioasmBuild'
+ninja: no work to do.
+[3/9] No install step for 'ELF2UF2Build'
+[4/9] No install step for 'PioasmBuild'
+[5/9] Completed 'ELF2UF2Build'
+[6/9] Completed 'PioasmBuild'
+[7/9] Building C object CMakeFiles/panel.dir/src/keys.c.obj
+[8/9] Building C object CMakeFiles/panel.dir/src/main.c.obj
+[9/9] Linking CXX executable panel.elf
+
+OK ->  C:\Users\tasos\Documents\projects\groovebox\panel-fw\build\panel.uf2
