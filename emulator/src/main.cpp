@@ -50,6 +50,8 @@
 #include "util/MessageQueue.h"
 #include "midi/MidiTypes.h"
 #include "instruments/DrumRack.h"
+#include "instruments/DrumSynth.h"
+#include "instruments/DrumSlop.h"
 #include "instruments/SubtractiveSynth.h"
 
 #include <nlohmann/json.hpp>
@@ -163,7 +165,9 @@ public:
                     : testMode == 9 ? " (NSR-1 rev B test)"
                     : testMode == 10 ? " (macro encoder test)"
                     : testMode == 11 ? " (track/channel test)"
-                    : testMode == 12 ? " (bounce/clip test)" : "");
+                    : testMode == 12 ? " (bounce/clip test)"
+                    : testMode == 13 ? " (drum key-map test)"
+                    : testMode == 14 ? " (last-played-pad edit test)" : "");
 
         if (!m_hal.init(*this)) return 1;
 
@@ -203,6 +207,7 @@ public:
         m_engine->sendCommand(yawn::audio::TransportSetBPMMsg{m_state.bpm});
         std::printf("[engine] tracks 0-3: T1=SubtractiveSynth, "
                     "T2=kick T3=hat T4=clap (one DrumRack each)\n");
+        for (int t = 0; t < 4; ++t) rebuildDrumVoices(t);
 
         // Bind pot/encoder params by name and sync the panel to the
         // engine: pots start engaged at the panel's default positions
@@ -363,6 +368,8 @@ public:
         if (m_testMode == 10) return macrotestVerdict();
         if (m_testMode == 11) return tracktestVerdict();
         if (m_testMode == 12) return bouncetestVerdict();
+        if (m_testMode == 13) return drumtestVerdict();
+        if (m_testMode == 14) return padtestVerdict();
         return 0;
     }
 
@@ -508,7 +515,8 @@ public:
         // over page routing — holding a white key and turning encoder
         // 1/2 must edit that step even if the SYNTH page is showing
         // (previously the page switch ate the gesture: wheel → cutoff).
-        if (m_heldStep >= 0 && m_state.track == 0 &&
+        if (m_heldStep >= 0 &&
+            (m_state.track == 0 || isDrumTrack(m_state.track)) &&
             (index == 0 || index == 1)) {
             editHeldStep(index, delta);
             return;
@@ -842,11 +850,28 @@ private:
     bool shiftHeld() const { return m_shiftL || m_shiftR; }
 
     // Held-step edit (rev B): pitch comes from a piano tap (p-lock);
-    // encoders while held adjust per-step GATE (50..100%).
+    // encoders while held adjust per-step GATE (50..100%) on melodic
+    // tracks, or cycle the step's drum VOICE on drum tracks (drums are
+    // one-shots — a gate edit is meaningless there).
     // Absolute step = window + held key index.
     void editHeldStep(int enc, int delta) {
-        (void)enc; // ENC1 = gate (any encoder drives gate while held)
+        (void)enc; // ENC1 = gate/voice (any encoder drives it while held)
+        const int t = m_state.track;
         const int step = m_window + m_heldStep;
+        if (isDrumTrack(t)) {
+            auto& s = m_pattern.steps[t][step];
+            m_heldEdited = true;
+            const int count = int(m_drumVoiceNotes[t].size());
+            if (count == 0) return;
+            const int idx = ((int(s.noteOffset) + delta) % count + count) % count;
+            s.noteOffset = int8_t(idx);
+            setEditPad(t, idx, false); // hold-step voice edit owns the pad
+            char vb[16];
+            toast("VOICE", drumVoiceName(t, idx, vb, sizeof(vb)));
+            std::printf("[seq] T%d step %02d voice %s (note %d)\n",
+                        t + 1, step, vb, drumVoiceNote(t, idx));
+            return;
+        }
         auto& s = m_pattern.steps[0][step];
         m_heldEdited = true;
         int g = s.gate > 0 ? s.gate
@@ -911,12 +936,13 @@ private:
     void selectTrack(int t) {
         m_state.track = t;
         m_state.pageName = (t == 0) ? "SYNTH" : "DRUMS";
-        // DrumRack pad params (attack/decay etc.) target the selected
-        // pad — point it at this track's lane.
+        // DrumRack pad params (attack/decay etc.) target the edit pad —
+        // the last-played voice (defaults to the lane pad at boot).
         if (t > 0)
             if (auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
                     m_engine->instrument(m_state.track)))
-                rack->setSelectedPad(gb::Pattern::kPadNote[t]);
+                rack->setSelectedPad(drumVoiceNote(t, m_editPad[t]));
+        rebuildDrumVoices(t); // cheap catch-all (pad/param changes)
         rebindParams(); // name-lookup bindings + pickup re-arm
         std::printf("[panel] track select -> T%d (%s)\n", t + 1,
                     t == 0 ? "SubtractiveSynth"
@@ -1006,6 +1032,15 @@ private:
 
     void gridPlayKey(int index, bool pressed, int row, int col) {
         const int rowFromBottom = 3 - row;
+        if (isDrumTrack(m_state.track)) {
+            // Drum track: the 4x8 grid is one bottom-up strip of 32
+            // positions walking the voice list (with wraparound).
+            const int vidx = col + 8 * rowFromBottom;
+            const int note = drumVoiceNote(m_state.track, vidx);
+            if (pressed) setEditPad(m_state.track, vidx, true);
+            playNote(m_state.track, note, pressed, index);
+            return;
+        }
         const int raw = 48 + col + 4 * rowFromBottom; // base C3
         const int note = snapToScale(raw, m_scaleLock);
         if (pressed) m_lastGridNote = note;
@@ -1108,9 +1143,170 @@ private:
                     step, s.accent ? "ON" : "off");
     }
 
+    // ── Drum voice mapping ──────────────────────────────────────────
+    // Drum instruments (drumsynth/drumrack/drumslop) do NOT respond to
+    // chromatic notes — they trigger per-voice notes (DrumSynth: GM
+    // kit notes 36..54; DrumRack: loaded pad notes; DrumSlop: 16 slice
+    // pads at baseNote+i). On a drum track the 27 piano keys therefore
+    // map to the instrument's VOICE LIST instead of semitones:
+    //
+    //   * the key row is treated as one physical left→right strip
+    //     (blacks interleave between whites by their panel position);
+    //   * key at physical position p plays voice (p % voiceCount) —
+    //     adjacent keys walk adjacent voices and past the last voice
+    //     the list WRAPS, so every one of the 27 keys sounds;
+    //   * velocity is unchanged (data slider / fixed / host).
+    //
+    // The voice list is rebuilt from the actual instrument state on
+    // boot, instrument swap, pad load and track select (selectTrack
+    // rebuild is the cheap catch-all for param changes like DrumSlop
+    // base note / slice count).
+    static bool isDrumInstrument(const char* id) {
+        return std::strcmp(id, "drumsynth") == 0 ||
+               std::strcmp(id, "drumrack") == 0 ||
+               std::strcmp(id, "drumslop") == 0;
+    }
+    bool isDrumTrack(int t) const {
+        return t >= 0 && t < 4 && isDrumInstrument(m_trackInstId[t].c_str());
+    }
+
+    // Physical left→right position (0..26) of a piano key index
+    // (whites 0..15, blacks 16..26 interleaved by semitone offset).
+    static int pianoPhysPos(int keyIndex) {
+        const int off = keyIndex <= 15 ? kWhiteOffsets[keyIndex]
+                                       : kBlackOffsets[keyIndex - 16];
+        int pos = 0;
+        for (int w : kWhiteOffsets) if (w < off) ++pos;
+        for (int b : kBlackOffsets) if (b < off) ++pos;
+        return pos;
+    }
+
+    void rebuildDrumVoices(int t) {
+        auto& v = m_drumVoiceNotes[t];
+        v.clear();
+        const std::string& id = m_trackInstId[t];
+        if (id == "drumsynth") {
+            for (int n : yawn::instruments::DrumSynth::kDrumNotes)
+                v.push_back(n);
+        } else if (id == "drumrack") {
+            if (auto* r = dynamic_cast<yawn::instruments::DrumRack*>(
+                    m_engine->instrument(gb::Pattern::engineTrack(t))))
+                for (int n = 0; n < yawn::instruments::DrumRack::kNumPads; ++n)
+                    if (r->hasSample(n)) v.push_back(n);
+            if (v.empty()) // pad not loaded yet — fall back to the lane
+                v.push_back(gb::Pattern::kPadNote[t]);
+        } else if (id == "drumslop") {
+            int base = 36, count = 8; // DrumSlop defaults
+            if (auto* inst = m_engine->instrument(gb::Pattern::engineTrack(t))) {
+                base = int(inst->getParameter(yawn::instruments::DrumSlop::kBaseNote));
+                count = int(inst->getParameter(yawn::instruments::DrumSlop::kSliceCount));
+            }
+            for (int i = 0; i < count; ++i) v.push_back(base + i);
+        }
+        // Edit pad can outlive a smaller voice list (instrument swap) —
+        // clamp it so binding math never goes out of range.
+        if (!v.empty() && m_editPad[t] >= int(v.size())) m_editPad[t] = 0;
+    }
+
+    // DrumSynth exposes NO selected-slot setter: its 36 params are
+    // globally indexed per voice (DrumSynth.h) — kick = 7 params at
+    // index 0 (Tune/Atk/Dec/Sine/White/Pink/Drive), every other voice
+    // = 4 params (Tune/Atk/Dec/Drive) at 7 + (slot-1)*4, +1 global
+    // (OS 2x at 35). The edit pad is therefore pure index arithmetic.
+    static int drumSynthBase(int slot) {
+        return slot == 0 ? 0 : 7 + (slot - 1) * 4;
+    }
+
+    // Last-played-pad tracking: make `vidx` the edit pad on drum track
+    // `t`. DrumRack/DrumSlop get it via their selectedPad setter (note
+    // number / pad index); DrumSynth needs nothing (see above). When
+    // `t` is the selected track the INST bindings are rebuilt to the
+    // new pad and a loud "EDIT <voice>" toast confirms the switch.
+    void setEditPad(int t, int vidx, bool loud) {
+        if (!isDrumTrack(t) || m_drumVoiceNotes[t].empty()) return;
+        const int n = int(m_drumVoiceNotes[t].size());
+        vidx = ((vidx % n) + n) % n;
+        if (vidx == m_editPad[t]) return;
+        m_editPad[t] = vidx;
+        const int note = m_drumVoiceNotes[t][vidx];
+        auto* inst = m_engine->instrument(gb::Pattern::engineTrack(t));
+        if (m_trackInstId[t] == "drumrack") {
+            if (auto* r = dynamic_cast<yawn::instruments::DrumRack*>(inst))
+                r->setSelectedPad(note);
+        } else if (m_trackInstId[t] == "drumslop") {
+            if (auto* s = dynamic_cast<yawn::instruments::DrumSlop*>(inst))
+                s->setSelectedPad(vidx);
+        }
+        char vb[16];
+        drumVoiceName(t, vidx, vb, sizeof(vb));
+        if (loud)
+            std::printf("[panel] EDIT pad T%d -> %s (note %d)\n",
+                        t + 1, vb, note);
+        if (t == m_state.track) {
+            rebindParams(); // pots/ADSR/pages follow the edit pad
+            if (loud) toast("EDIT", vb);
+        }
+    }
+
+    // Voice note with wraparound — ANY index maps to a real voice.
+    int drumVoiceNote(int t, int voiceIdx) const {
+        const auto& v = m_drumVoiceNotes[t];
+        if (v.empty()) return m_pattern.noteForTrack(t);
+        const int n = int(v.size());
+        return v[((voiceIdx % n) + n) % n];
+    }
+    // Reverse lookup for REC quantization; -1 when not a voice note.
+    int drumVoiceIndexForNote(int t, int note) const {
+        const auto& v = m_drumVoiceNotes[t];
+        for (int i = 0; i < int(v.size()); ++i) if (v[i] == note) return i;
+        return -1;
+    }
+    // Short display name for toasts/logs. DrumSynth has no name API —
+    // names follow the DrumSlot order documented in DrumSynth.h.
+    const char* drumVoiceName(int t, int voiceIdx, char* buf, size_t n) const {
+        if (m_trackInstId[t] == "drumsynth") {
+            static const char* kNames[yawn::instruments::DrumSynth::kNumDrums] =
+                {"KICK", "SNARE", "CLAP", "TOM1", "CHH", "OHH", "TOM2", "TAMB"};
+            const int i = ((voiceIdx % 8) + 8) % 8;
+            std::snprintf(buf, n, "%s", kNames[i]);
+        } else if (m_trackInstId[t] == "drumslop") {
+            std::snprintf(buf, n, "SL%d", voiceIdx + 1);
+        } else {
+            std::snprintf(buf, n, "PAD%d", drumVoiceNote(t, voiceIdx));
+        }
+        return buf;
+    }
+
+    // MIDI note a pattern step fires. On drum tracks Step::noteOffset
+    // is repurposed as a VOICE INDEX (0 = first voice = kick); on
+    // melodic tracks it stays a semitone offset from the track note.
+    int stepNote(int t, int step) const {
+        if (!isDrumTrack(t)) return m_pattern.noteForStep(t, step);
+        return drumVoiceNote(t, m_pattern.steps[t][step].noteOffset);
+    }
+
     // ── NSR-1 rev B: piano row (always playable, scale-lockable) ────
     void pianoKey(int keyIndex, bool pressed) {
         const int t = m_state.track;
+        if (isDrumTrack(t)) {
+            // Drum track: physical strip position -> voice (wraps).
+            const int vidx = pianoPhysPos(keyIndex);
+            const int note = drumVoiceNote(t, vidx);
+            // last-played pad becomes the INST edit pad (manual play)
+            if (pressed) setEditPad(t, vidx, true);
+            // hold-step + piano tap = p-lock the step's drum voice
+            if (pressed && m_heldStep >= 0) {
+                const int step = m_window + m_heldStep;
+                m_pattern.steps[t][step].noteOffset = int8_t(vidx);
+                m_heldEdited = true;
+                char vb[16];
+                toast("VOICE", drumVoiceName(t, vidx, vb, sizeof(vb)));
+                std::printf("[seq] T%d step %02d voice %s (%d)\n",
+                            t + 1, step, vb, note);
+            }
+            playKey(keyIndex, pressed, note);
+            return;
+        }
         const int raw = (t == 0)
             ? m_baseNote + (keyIndex <= 15 ? kWhiteOffsets[keyIndex]
                                            : kBlackOffsets[keyIndex - 16])
@@ -1186,7 +1382,10 @@ private:
                 auto& s = m_pattern.steps[t][step];
                 s.on = true;
                 s.vel = uint8_t(velocity7());
-                if (t == 0) // keep the played pitch on T1
+                if (isDrumTrack(t)) { // keep the played drum voice
+                    const int vi = drumVoiceIndexForNote(t, note);
+                    s.noteOffset = int8_t(vi >= 0 ? vi : 0);
+                } else if (t == 0) // keep the played pitch on T1
                     s.noteOffset = int8_t(note - m_pattern.t1Note);
                 m_recordedNote = true;
                 std::printf("[seq] REC T%d step %02d vel=%d @beat %.2f\n",
@@ -1199,7 +1398,7 @@ private:
     }
 
     void sendNote(int track, int note, bool on, int vel7) {
-        if (on) ++m_probeNotes; // panelprobe assertion
+        if (on) { ++m_probeNotes; m_lastNoteOn = note; } // probe/drumtest
         m_engine->sendCommand(yawn::audio::SendMidiToTrackMsg{
             gb::Pattern::engineTrack(track),
             uint8_t(on ? yawn::midi::MidiMessage::Type::NoteOn
@@ -1243,7 +1442,7 @@ private:
 
     void fireStep(int t, int step, const gb::Pattern::Step& s,
                   double beats) {
-        const int note = m_pattern.noteForStep(t, step);
+        const int note = stepNote(t, step);
         const int vel = s.accent ? 127 : s.vel;
         sendNote(t, note, true, vel);
         const float gate = m_pattern.gateForStep(t, step);
@@ -1433,12 +1632,13 @@ private:
 
     // ── Encoder param pages (built dynamically, pot-owned excluded) ──
     // Design rule: each parameter belongs to exactly ONE control. The
-    // 6 pots own filter cutoff/resonance + amp A/D/S/R (and Pad
-    // Attack/Decay on drum tracks); encoder pages are built from the
-    // instrument's parameterInfo MINUS those names, partitioned:
-    //   OSC  — osc/wave/sub level params
-    //   MOD  — lfo/env/noise/filter type params
-    //   MISC — everything else not mapped elsewhere
+    // pots own filter cutoff/resonance; dedicated encoders 5-8 own amp
+    // A/D/S/R — on drum tracks that's the EDIT PAD's attack/decay (the
+    // last-played pad, see setEditPad). Encoder pages are built from
+    // the instrument's parameterInfo MINUS those, partitioned:
+    //   melodic: OSC (osc/wave/sub level) / MOD (lfo/env/noise/filter
+    //            type) / MISC (everything else)
+    //   drums:   PAD/PAD2 (edit pad's params) / KIT (globals)
     // Pages with <4 params show "---" slots; empty pages are skipped
     // when cycling (S2 = PG+).
     struct EncPage { int count = 0; int param[4] = {-1, -1, -1, -1}; };
@@ -1466,13 +1666,52 @@ private:
         static const char* kOscKw[] = {"osc", "wave", "sub level"};
         static const char* kModKw[] = {"lfo", "env", "noise", "filter type"};
         for (auto& pg : m_encPages) pg = EncPage{};
-        if (auto* inst = selInstrument()) {
+        auto claim = [&](int section, int pidx) {
+            if (m_encPages[section].count < 4)
+                m_encPages[section].param[m_encPages[section].count++] =
+                    pidx;
+        };
+        if (isDrumTrack(m_state.track)) {
+            // Drum pages: PAD/PAD2 = the EDIT PAD's params (dedicated
+            // A/D/S/R excluded — the macros own those), KIT = global.
+            const std::string& id = m_trackInstId[m_state.track];
+            const int slot = m_editPad[m_state.track];
+            if (id == "drumsynth") {
+                const int b = drumSynthBase(slot);
+                claim(0, b + 0); // Tune
+                if (slot == 0) { // kick adds the noise-mix trio + Drive
+                    claim(0, b + 3); claim(0, b + 4); claim(0, b + 5);
+                    claim(1, b + 6);
+                } else {
+                    claim(0, b + 3); // Drive
+                }
+                claim(2, yawn::instruments::DrumSynth::pOversample);
+            } else if (id == "drumrack") {
+                namespace dr = yawn::instruments;
+                claim(0, dr::DrumRack::kPadVolume);
+                claim(0, dr::DrumRack::kPadPan);
+                claim(0, dr::DrumRack::kPadPitch);
+                claim(0, dr::DrumRack::kPadChoke);
+                claim(1, dr::DrumRack::kPadStart);
+                claim(1, dr::DrumRack::kPadEnd);
+                claim(2, dr::DrumRack::kVolume);
+            } else { // drumslop
+                namespace dr = yawn::instruments;
+                claim(0, dr::DrumSlop::kPadVolume);
+                claim(0, dr::DrumSlop::kPadPan);
+                claim(0, dr::DrumSlop::kPadPitch);
+                claim(0, dr::DrumSlop::kPadReverse);
+                claim(1, dr::DrumSlop::kPadFilterCutoff);
+                claim(1, dr::DrumSlop::kPadFilterReso);
+                claim(2, dr::DrumSlop::kVolume);
+                claim(2, dr::DrumSlop::kSliceCount);
+                claim(2, dr::DrumSlop::kSliceMode);
+                claim(2, dr::DrumSlop::kOriginalBPM);
+                // (Base Note + Swing overflow the 4-slot KIT page —
+                //  Base Note is reachable via track reselect rebuild.)
+            }
+        } else if (auto* inst = selInstrument()) {
             const int n = inst->parameterCount();
-            auto claim = [&](int section, int pidx) {
-                if (m_encPages[section].count < 4)
-                    m_encPages[section].param[m_encPages[section].count++] =
-                        pidx;
-            };
             for (int i = 0; i < n; ++i) {
                 const char* nm = inst->parameterInfo(i).name;
                 if (!isDedicatedIndex(i) && nameHasAny(nm, kOscKw, 3))
@@ -1495,6 +1734,17 @@ private:
         else applyEncPage();
     }
 
+    // Encoder page titles: PAD/PAD2/KIT on drum tracks, OSC/MOD/MISC
+    // on melodic instruments.
+    const char* encPageTitle(int p) const {
+        if (isDrumTrack(m_state.track)) {
+            static constexpr const char* kDrumTitles[3] =
+                {"PAD", "PAD2", "KIT"};
+            return kDrumTitles[p];
+        }
+        return kEncPageTitles[p];
+    }
+
     void applyEncPage() {
         for (int i = 0; i < 4; ++i)
             m_encParam[i] = i < m_encPages[m_paramPage].count
@@ -1507,14 +1757,40 @@ private:
             if (m_encPages[m_paramPage].count > 0) break;
         }
         applyEncPage();
-        std::printf("[panel] param page -> %s\n", kEncPageTitles[m_paramPage]);
+        std::printf("[panel] param page -> %s\n", encPageTitle(m_paramPage));
     }
 
     void rebindParams() {
         for (int i = 0; i < 2; ++i) m_potParam[i] = findParam(kPotNames[i]);
         for (int i = 0; i < 2; ++i) m_potEngaged[i] = false;
-        for (int i = 0; i < 4; ++i)
-            m_adsrParam[i] = findParam(kAdsrNames[i]);
+        if (isDrumTrack(m_state.track)) {
+            // Drum tracks: ADSR macros own the EDIT PAD's attack/decay
+            // (last-played pad — setEditPad rebuilds these). Bound by
+            // INDEX, not name: DrumSynth repeats "Atk"/"Dec" per voice
+            // and DrumSlop prefixes "Pad ", so findParam can't work.
+            // S/R stay inert except on DrumSlop (the only one that has
+            // them). Pots keep their name bindings (CUT/RES exist only
+            // on DrumSlop pads; inert on DrumSynth/DrumRack).
+            const std::string& id = m_trackInstId[m_state.track];
+            if (id == "drumsynth") {
+                const int b = drumSynthBase(m_editPad[m_state.track]);
+                m_adsrParam[0] = b + 1; // voice Atk
+                m_adsrParam[1] = b + 2; // voice Dec
+                m_adsrParam[2] = m_adsrParam[3] = -1;
+            } else if (id == "drumrack") {
+                m_adsrParam[0] = yawn::instruments::DrumRack::kPadAttack;
+                m_adsrParam[1] = yawn::instruments::DrumRack::kPadDecay;
+                m_adsrParam[2] = m_adsrParam[3] = -1;
+            } else { // drumslop
+                m_adsrParam[0] = yawn::instruments::DrumSlop::kPadAttack;
+                m_adsrParam[1] = yawn::instruments::DrumSlop::kPadDecay;
+                m_adsrParam[2] = yawn::instruments::DrumSlop::kPadSustain;
+                m_adsrParam[3] = yawn::instruments::DrumSlop::kPadRelease;
+            }
+        } else {
+            for (int i = 0; i < 4; ++i)
+                m_adsrParam[i] = findParam(kAdsrNames[i]);
+        }
         // macros: per-track assignment, factory = ADSR
         for (int i = 0; i < 4; ++i) {
             const int assigned = m_macroParamByTrack[m_state.track][i];
@@ -1760,6 +2036,7 @@ private:
             // bindings rebuilt from its parameterInfo
             for (int i = 0; i < 4; ++i) m_macroParamByTrack[t][i] = -1;
             rebindParams();
+            rebuildDrumVoices(t); // voice map follows the instrument
             std::printf("[inst] T%d <- %s\n", t + 1,
                         descs[sel].displayName);
             toast("INST", descs[sel].displayName);
@@ -1900,7 +2177,7 @@ private:
                     const int step = int(absStep % m_pattern.length);
                     const auto& st = m_pattern.steps[src][step];
                     if (st.on) {
-                        const int note = m_pattern.noteForStep(src, step);
+                        const int note = stepNote(src, step);
                         m_engine->sendCommand(yawn::audio::SendMidiToTrackMsg{
                             src, uint8_t(yawn::midi::MidiMessage::Type::NoteOn),
                             0, uint8_t(note),
@@ -2104,6 +2381,7 @@ private:
                 m_engine->instrument(m_state.track)))
             rack->loadPad(gb::Pattern::kPadNote[m_state.track], st.data(),
                           n, 2);
+        rebuildDrumVoices(m_state.track);
         m_assigned = true;
         std::printf("[sample] assigned %s (%d frames) -> T%d pad %d\n",
                     name, n, m_state.track + 1,
@@ -2186,6 +2464,7 @@ private:
                 m_engine->instrument(m_state.track)))
             rack->loadPad(gb::Pattern::kPadNote[m_state.track],
                           data.data(), n, 2);
+        rebuildDrumVoices(m_state.track);
         std::printf("[load] %s (%d frames @%d) -> T%d pad %d\n",
                     full.c_str(), n, sr, m_state.track + 1,
                     gb::Pattern::kPadNote[m_state.track]);
@@ -2360,6 +2639,13 @@ private:
 
     // ── Param/FX sync (engine → UI, every frame) ────────────────────
     void syncParamsToUi() {
+        // INST page header: edit pad (last-played voice) on drum tracks
+        m_state.padName =
+            isDrumTrack(m_state.track)
+                ? drumVoiceName(m_state.track, m_editPad[m_state.track],
+                                m_padNameBuf[m_state.track],
+                                sizeof(m_padNameBuf[m_state.track]))
+                : nullptr;
         // param rows: CUT/RES (pots) + A/D/S/R (engine ADSR values,
         // informational — macros may be assigned elsewhere); unbound
         // (drums CUT/RES/S/R) → "—"
@@ -2490,7 +2776,9 @@ private:
         else if (m_testMode == 9) revbtestStep(t, once);
         else if (m_testMode == 10) macrotestStep(t, once);
         else if (m_testMode == 11) tracktestStep(t, once);
-        else                       bouncetestStep(t, once);
+        else if (m_testMode == 12) bouncetestStep(t, once);
+        else if (m_testMode == 13) drumtestStep(t, once);
+        else                       padtestStep(t, once);
     }
 
     // --smoke: boot + notes on both engine tracks + frame per page.
@@ -3015,18 +3303,23 @@ private:
             dumpFrame("paramtest_toast.rgb565");
         }
         if (t >= 1.9 && once(11)) {
-            // DrumRack: OSC/MOD pages are empty — cycling must land on
-            // and stay on MISC (the only non-empty page).
+            // DrumRack: pages are PAD (4 pad params) / PAD2 (Start/End)
+            // / KIT (Volume) — PG+ walks all three in order (all
+            // non-empty, so none are skipped).
             setPage(0);
-            m_ptOk[10] = m_encPages[0].count == 0 &&
-                         m_encPages[1].count == 0 &&
-                         m_encPages[2].count == 4 && m_paramPage == 2;
-            softKey(1); // PG+ must stay on MISC
-            m_ptOk[10] = m_ptOk[10] && m_paramPage == 2;
-            std::printf("[paramtest] drum pages: OSC=%d MOD=%d MISC=%d "
-                        "current=%s\n", m_encPages[0].count,
+            m_ptOk[10] = m_encPages[0].count == 4 &&
+                         m_encPages[1].count == 2 &&
+                         m_encPages[2].count == 1;
+            const int p0 = m_paramPage;
+            softKey(1); // PG+
+            const int p1 = m_paramPage;
+            softKey(1); // PG+
+            m_ptOk[10] = m_ptOk[10] && p1 == (p0 + 1) % 3 &&
+                         m_paramPage == (p0 + 2) % 3;
+            std::printf("[paramtest] drum pages: PAD=%d PAD2=%d KIT=%d "
+                        "cycle %d->%d->%d\n", m_encPages[0].count,
                         m_encPages[1].count, m_encPages[2].count,
-                        kEncPageTitles[m_paramPage]);
+                        p0, p1, m_paramPage);
         }
         if (t >= 2.0 && once(8)) {
             std::printf("[paramtest] done — asserting\n");
@@ -3051,7 +3344,7 @@ private:
         check(m_ptOk[7], "drum track: ENC5 (macro 1) maps to Pad Attack");
         check(m_ptOk[8], "page encoders never touch dedicated params");
         check(m_ptOk[9], "SubSynth OSC+MOD pages have 4 params each");
-        check(m_ptOk[10], "drum: empty pages skipped (MISC only)");
+        check(m_ptOk[10], "drum: PAD/PAD2/KIT pages, PG+ cycles");
         check(m_ptOk[11], "ADSR macro edit + shift-fine (default bind)");
         std::printf("[paramtest] %d/%d assertions PASS\n", pass, pass + fail);
         return fail == 0 ? 0 : 1;
@@ -3534,6 +3827,324 @@ private:
         return fail == 0 ? 0 : 1;
     }
 
+    // --padtest: last-played-pad parameter editing. T1 -> drumsynth;
+    // playing a voice makes it the edit pad (INST bindings + toast
+    // follow); per-voice params retain edits across pad switches;
+    // sequencer fire never steals the edit pad; DrumRack selectedPad
+    // follows through the instrument's own setter.
+    template <typename Once>
+    void padtestStep(double t, Once& once) {
+        auto inst = [&]() { return m_engine->instrument(0); };
+        if (t >= 0.3 && once(0)) {
+            // Swap T1 -> drumsynth via the real chooser path.
+            m_state.track = 0;
+            m_chooserKind = 1;
+            m_state.chooserOpen = true;
+            const auto& descs = yawn::instrumentDescriptors();
+            int sel = -1;
+            for (int i = 0; i < int(descs.size()); ++i)
+                if (std::strcmp(descs[i].id, "drumsynth") == 0) sel = i;
+            m_state.chooserSel = sel;
+            chooserConfirm();
+            m_padOk[0] = m_trackInstId[0] == "drumsynth" &&
+                         m_drumVoiceNotes[0].size() == 8 &&
+                         m_editPad[0] == 0;
+            std::printf("[padtest] T1 -> drumsynth, edit pad %d, "
+                        "PAD page params:", m_editPad[0]);
+            for (int i = 0; i < 4 && m_encParam[i] >= 0; ++i)
+                std::printf(" %s",
+                            inst()->parameterInfo(m_encParam[i]).name);
+            std::printf("\n");
+        }
+        if (t >= 0.6 && once(1)) {
+            // Play snare (black key 1 = strip pos 1) -> EDIT SNARE.
+            onKey(gb::kKeyBlack0 + 0, true);
+            onKey(gb::kKeyBlack0 + 0, false);
+            const bool names =
+                std::strcmp(inst()->parameterInfo(m_adsrParam[0]).name,
+                            "Atk") == 0 &&
+                std::strcmp(inst()->parameterInfo(m_encParam[0]).name,
+                            "Tune") == 0;
+            std::printf("[padtest] snare: editPad=%d toast=\"%s\" "
+                        "A-idx=%d PAD0-idx=%d (%s/%s)\n", m_editPad[0],
+                        m_state.toastValue, m_adsrParam[0], m_encParam[0],
+                        inst()->parameterInfo(m_adsrParam[0]).name,
+                        inst()->parameterInfo(m_encParam[0]).name);
+            m_padOk[1] = m_editPad[0] == 1 &&
+                         std::strcmp(m_state.toastValue, "SNARE") == 0 &&
+                         m_adsrParam[0] == drumSynthBase(1) + 1 &&
+                         m_encParam[0] == drumSynthBase(1) && names;
+        }
+        if (t >= 0.9 && once(2)) {
+            // Edit snare Tune (PAD page encoder 1), then switch to kick:
+            // bindings must follow, snare edit must be retained.
+            const float tune0 = inst()->getParameter(drumSynthBase(1));
+            onEncoderDelta(0, +4); // +4/16 norm on snare Tune
+            const float tune1 = inst()->getParameter(drumSynthBase(1));
+            onKey(gb::kKeyWhite0 + 0, true);  // kick
+            onKey(gb::kKeyWhite0 + 0, false);
+            const float snareTuneAfter =
+                inst()->getParameter(drumSynthBase(1));
+            std::printf("[padtest] snare tune %.3f -> %.3f; kick: "
+                        "editPad=%d toast=\"%s\" A-idx=%d PAD0-idx=%d; "
+                        "snare tune retained=%d\n", double(tune0),
+                        double(tune1), m_editPad[0], m_state.toastValue,
+                        m_adsrParam[0], m_encParam[0],
+                        int(snareTuneAfter == tune1));
+            m_padOk[2] = tune1 > tune0 && m_editPad[0] == 0 &&
+                         std::strcmp(m_state.toastValue, "KICK") == 0 &&
+                         m_adsrParam[0] == 1 && m_encParam[0] == 0 &&
+                         snareTuneAfter == tune1;
+        }
+        if (t >= 1.2 && once(3)) {
+            // Macro A (factory binding) edits the CURRENT pad's attack:
+            // kick Atk moves, snare Atk untouched.
+            const float kickA0 = inst()->getParameter(1);
+            const float snareA0 = inst()->getParameter(8);
+            onEncoderDelta(4, +8); // macro 1, +8/64 norm
+            const float kickA1 = inst()->getParameter(1);
+            const float snareA1 = inst()->getParameter(8);
+            std::printf("[padtest] macro A: kick atk %.3f -> %.3f, "
+                        "snare atk %.3f -> %.3f (macro idx=%d)\n",
+                        double(kickA0), double(kickA1), double(snareA0),
+                        double(snareA1), m_macroParam[0]);
+            m_padOk[3] = m_macroParam[0] == 1 && kickA1 > kickA0 &&
+                         snareA1 == snareA0;
+        }
+        if (t >= 1.5 && once(4)) {
+            // Hold-step voice p-lock also sets the edit pad.
+            onStepRowKey(0, true);
+            onKey(gb::kKeyWhite0 + 4, true);  // strip pos 7 = tambourine
+            onKey(gb::kKeyWhite0 + 4, false);
+            onStepRowKey(0, false);
+            std::printf("[padtest] p-lock: noteOffset=%d editPad=%d "
+                        "A-idx=%d (want 7/7/%d)\n",
+                        int(m_pattern.steps[0][0].noteOffset),
+                        m_editPad[0], m_adsrParam[0],
+                        drumSynthBase(7) + 1);
+            m_padOk[4] = int(m_pattern.steps[0][0].noteOffset) == 7 &&
+                         m_editPad[0] == 7 &&
+                         m_adsrParam[0] == drumSynthBase(7) + 1;
+        }
+        if (t >= 1.8 && once(5)) {
+            // Sequencer fire does NOT steal the edit pad.
+            m_pattern.steps[0][1].on = true;
+            m_pattern.steps[0][1].noteOffset = 0; // kick
+            fireStep(0, 1, m_pattern.steps[0][1], 0.0);
+            std::printf("[padtest] after step fire: editPad=%d (want 7)\n",
+                        m_editPad[0]);
+            m_padOk[5] = m_editPad[0] == 7;
+        }
+        if (t >= 2.1 && once(6)) {
+            // DrumRack (T2): load a second pad, play it, selectedPad
+            // follows via the instrument's own setter.
+            selectTrack(1);
+            auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
+                m_engine->instrument(1));
+            auto smp = makeDrumSample(1, m_engine->sampleRate());
+            if (rack)
+                rack->loadPad(38, smp.data(), int(smp.size()) / 2, 2);
+            rebuildDrumVoices(1);
+            std::printf("[padtest] T2 voices (%zu):",
+                        m_drumVoiceNotes[1].size());
+            for (int n : m_drumVoiceNotes[1]) std::printf(" %d", n);
+            std::printf("\n");
+            onKey(gb::kKeyBlack0 + 0, true);  // pos 1 -> pad 38
+            onKey(gb::kKeyBlack0 + 0, false);
+            const bool follow38 = rack && rack->selectedPad() == 38 &&
+                                  m_editPad[1] == 1 &&
+                                  std::strcmp(m_state.toastValue,
+                                              "PAD38") == 0;
+            std::printf("[padtest] T2 play pad38: selectedPad=%d "
+                        "editPad=%d toast=\"%s\"\n",
+                        rack ? rack->selectedPad() : -1, m_editPad[1],
+                        m_state.toastValue);
+            // sequencer fire (voice 0) must not steal; white1 -> 36.
+            m_pattern.steps[1][0].on = true;
+            m_pattern.steps[1][0].noteOffset = 0;
+            fireStep(1, 0, m_pattern.steps[1][0], 0.0);
+            const bool noSteal = m_editPad[1] == 1 &&
+                                 rack->selectedPad() == 38;
+            onKey(gb::kKeyWhite0 + 0, true);
+            onKey(gb::kKeyWhite0 + 0, false);
+            const bool follow36 = rack->selectedPad() == 36 &&
+                                  m_editPad[1] == 0;
+            std::printf("[padtest] T2: fire-steal=%d, white1 -> "
+                        "selectedPad=%d editPad=%d\n", int(!noSteal),
+                        rack ? rack->selectedPad() : -1, m_editPad[1]);
+            m_padOk[6] = m_drumVoiceNotes[1].size() == 2 && follow38;
+            m_padOk[7] = noSteal && follow36;
+            m_running = false;
+        }
+    }
+
+    int padtestVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[padtest] ASSERT %-48s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_padOk[0], "INST swap T1->drumsynth, edit pad = kick");
+        check(m_padOk[1], "play snare -> EDIT SNARE + snare bindings");
+        check(m_padOk[2], "pad switch to kick, snare tune retained");
+        check(m_padOk[3], "macro A edits current pad attack only");
+        check(m_padOk[4], "hold-step voice p-lock sets edit pad");
+        check(m_padOk[5], "sequencer fire does not steal edit pad");
+        check(m_padOk[6], "DrumRack: pad load + play -> selectedPad");
+        check(m_padOk[7], "DrumRack: no fire-steal, back to lane pad");
+        std::printf("[padtest] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
+    // --drumtest: drum key map. Baseline chromatic check on T1=subsynth,
+    // then swap T1 -> drumsynth through the real INST chooser path and
+    // sweep all 27 piano keys asserting every note-on is a real DrumSynth
+    // voice (yawn's own slotForNote is the acceptance condition the
+    // instrument itself uses). Then: wraparound, sequencer defaults,
+    // hold-step voice p-lock, encoder voice cycling, DrumRack track
+    // sanity, non-drum track unaffected.
+    template <typename Once>
+    void drumtestStep(double t, Once& once) {
+        if (t >= 0.3 && once(0)) {
+            // Baseline: T1 = subsynth, key row is chromatic from C4.
+            m_dtOk[6] = !isDrumTrack(0);
+            onKey(gb::kKeyWhite0 + 0, true);  // white 1 = C4
+            const int n0 = m_lastNoteOn;
+            onKey(gb::kKeyWhite0 + 0, false);
+            onKey(gb::kKeyBlack0 + 0, true);  // black 1 = C#4
+            const int n1 = m_lastNoteOn;
+            onKey(gb::kKeyBlack0 + 0, false);
+            std::printf("[drumtest] baseline subsynth: white1=%d (want 60)"
+                        " black1=%d (want 61)\n", n0, n1);
+            m_dtOk[0] = (n0 == 60 && n1 == 61);
+        }
+        if (t >= 0.6 && once(1)) {
+            // Swap T1 -> drumsynth via the real chooser path.
+            m_state.track = 0;
+            m_chooserKind = 1; // INST
+            m_state.chooserOpen = true;
+            const auto& descs = yawn::instrumentDescriptors();
+            int sel = -1;
+            for (int i = 0; i < int(descs.size()); ++i)
+                if (std::strcmp(descs[i].id, "drumsynth") == 0) sel = i;
+            std::printf("[drumtest] INST swap T1 -> drumsynth (sel=%d)\n",
+                        sel);
+            m_state.chooserSel = sel;
+            chooserConfirm();
+            m_dtOk[1] = m_trackInstId[0] == "drumsynth" &&
+                        m_drumVoiceNotes[0].size() ==
+                            size_t(yawn::instruments::DrumSynth::kNumDrums);
+            std::printf("[drumtest] voice list (%zu):",
+                        m_drumVoiceNotes[0].size());
+            for (int n : m_drumVoiceNotes[0]) std::printf(" %d", n);
+            std::printf("\n");
+        }
+        if (t >= 0.9 && once(2)) {
+            // Sweep all 27 piano keys through the HAL path; every
+            // note-on must be a real DrumSynth voice.
+            bool allValid = true;
+            bool hit[yawn::instruments::DrumSynth::kNumDrums] = {};
+            for (int k = 0; k <= 26; ++k) {
+                onKey(k, true);
+                const int note = m_lastNoteOn;
+                onKey(k, false);
+                const int slot =
+                    yawn::instruments::DrumSynth::slotForNote(note);
+                char vb[16];
+                std::printf("[drumtest] key %2d (pos %2d) -> note %3d "
+                            "voice %-6s slot %d\n", k, pianoPhysPos(k),
+                            note,
+                            drumVoiceName(0, pianoPhysPos(k), vb,
+                                          sizeof(vb)),
+                            slot);
+                if (slot < 0) allValid = false;
+                else hit[slot] = true;
+                if (k == 26) // wraparound: pos 25 -> 25 % 8 = slot 1
+                    m_dtOk[3] = slot == 1 &&
+                                note == yawn::instruments::DrumSynth::
+                                            kDrumNotes[1];
+            }
+            int distinct = 0;
+            for (bool h : hit) if (h) ++distinct;
+            m_dtVoicesHit = distinct;
+            m_dtOk[2] = allValid;
+            std::printf("[drumtest] sweep: all-valid=%d distinct-voices"
+                        "=%d/8\n", int(allValid), distinct);
+        }
+        if (t >= 1.2 && once(3)) {
+            // Sequencer: fresh step on a drum track defaults to voice 0
+            // (kick); hold-step + piano tap p-locks a voice; encoder
+            // cycles voices with wrap.
+            toggleStep(0, 0);
+            m_dtOk[4] = stepNote(0, 0) ==
+                yawn::instruments::DrumSynth::kDrumNotes[0];
+            std::printf("[drumtest] fresh step note=%d (want 36 kick)\n",
+                        stepNote(0, 0));
+            // hold step 1, tap white key 5 (pos 7 -> voice 7 = tamb)
+            onStepRowKey(0, true);
+            onKey(gb::kKeyWhite0 + 4, true);
+            onKey(gb::kKeyWhite0 + 4, false);
+            onStepRowKey(0, false); // heldEdited -> no toggle
+            m_dtOk[5] = int(m_pattern.steps[0][0].noteOffset) == 7 &&
+                        stepNote(0, 0) == 54;
+            std::printf("[drumtest] p-lock: noteOffset=%d (want 7) "
+                        "stepNote=%d (want 54 tamb)\n",
+                        int(m_pattern.steps[0][0].noteOffset),
+                        stepNote(0, 0));
+            // encoder +1 wraps voice 7 -> 0 (kick), toast shows name
+            onStepRowKey(0, true);
+            onEncoderDelta(0, +1);
+            onStepRowKey(0, false);
+            m_dtOk[5] = m_dtOk[5] &&
+                        int(m_pattern.steps[0][0].noteOffset) == 0 &&
+                        stepNote(0, 0) == 36 &&
+                        std::strcmp(m_state.toastValue, "KICK") == 0;
+            std::printf("[drumtest] enc cycle: noteOffset=%d stepNote=%d"
+                        " toast=\"%s\" (want 0/36/KICK)\n",
+                        int(m_pattern.steps[0][0].noteOffset),
+                        stepNote(0, 0), m_state.toastValue);
+        }
+        if (t >= 1.5 && once(4)) {
+            // DrumRack lane (T2, one loaded pad @36): every key wraps to
+            // that pad; melodic-inst check above covers non-drum.
+            selectTrack(1);
+            m_dtOk[7] = m_drumVoiceNotes[1].size() == 1 &&
+                        m_drumVoiceNotes[1][0] == 36;
+            onKey(gb::kKeyWhite0 + 0, true);
+            const int na = m_lastNoteOn;
+            onKey(gb::kKeyWhite0 + 0, false);
+            onKey(gb::kKeyBlack0 + 10, true); // last key
+            const int nb = m_lastNoteOn;
+            onKey(gb::kKeyBlack0 + 10, false);
+            std::printf("[drumtest] T2 drumrack: voices=%zu key1=%d "
+                        "key27=%d (want 1/36/36)\n",
+                        m_drumVoiceNotes[1].size(), na, nb);
+            m_dtOk[7] = m_dtOk[7] && na == 36 && nb == 36;
+            m_running = false;
+        }
+    }
+
+    int drumtestVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[drumtest] ASSERT %-46s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_dtOk[0], "baseline: subsynth key row chromatic (C4/C#4)");
+        check(m_dtOk[1], "INST swap T1->drumsynth builds 8-voice list");
+        check(m_dtOk[2], "all 27 keys trigger a real DrumSynth voice");
+        check(m_dtVoicesHit == 8, "sweep covers all 8 DrumSynth voices");
+        check(m_dtOk[3], "key 27 wraps to a valid voice (snare 38)");
+        check(m_dtOk[4], "fresh drum step defaults to voice 0 (kick 36)");
+        check(m_dtOk[5], "hold-step p-lock + encoder voice cycle (+toast)");
+        check(m_dtOk[6], "T1 not a drum track before the swap");
+        check(m_dtOk[7], "T2 drumrack: single pad, all keys wrap to 36");
+        std::printf("[drumtest] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
     // --bouncetest: AUDIO-track clip record (test capture source),
     // bounce T1 pattern -> WAV -> clip on first AUDIO track + mute src,
     // FX 2-slot independence.
@@ -3890,6 +4501,19 @@ private:
     float m_clipPeak = 0.0f;
     int m_t3FiresAtMute = 0;
     int m_lastGridNote = -1;
+
+    // Drum voice mapping (see rebuildDrumVoices): per-track voice list
+    // for drumsynth/drumrack/drumslop; piano keys walk it with wrap.
+    std::vector<int> m_drumVoiceNotes[4];
+    // Last-played-pad editing: voice INDEX of the pad the INST page /
+    // ADSR macros edit on a drum track. Follows manual key play and
+    // hold-step voice edits — never sequencer triggers.
+    int m_editPad[4] = {};
+    char m_padNameBuf[4][16] = {};
+    int m_lastNoteOn = -1;    // last note-on sent (drumtest)
+    bool m_dtOk[8] = {};      // drumtest assertions
+    bool m_padOk[8] = {};     // padtest assertions
+    int m_dtVoicesHit = 0;    // distinct voices across the 27-key sweep
 };
 
 namespace {
@@ -4051,6 +4675,8 @@ int main(int argc, char** argv) {
         if (std::strcmp(argv[i], "--macrotest") == 0)  testMode = 10;
         if (std::strcmp(argv[i], "--tracktest") == 0)  testMode = 11;
         if (std::strcmp(argv[i], "--bouncetest") == 0) testMode = 12;
+        if (std::strcmp(argv[i], "--drumtest") == 0)   testMode = 13;
+        if (std::strcmp(argv[i], "--padtest") == 0)    testMode = 14;
         if (std::strcmp(argv[i], "--profile") == 0 && i + 1 < argc)
             profileSecs = std::atoi(argv[i + 1]);
     }

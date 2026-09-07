@@ -24,6 +24,9 @@ struct UiParam {
 
 struct UiState {
     const char* pageName = "SYNTH"; // page 0 title (SYNTH / DRUMS)
+    // INST page on drum tracks: the edit pad (last-played voice), drawn
+    // inverse-video in the header. nullptr on melodic tracks.
+    const char* padName = nullptr;
     int page = 0;           // 0 = SYNTH, 1 = SEQ, 2 = MIXER
     int track = 0;          // 0-based engine track shown in header
     double bpm = 120.0;

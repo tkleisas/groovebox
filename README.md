@@ -29,7 +29,11 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
   gate (hold-step + encoders, synth track).
 - **Play mode**: the keyboard row becomes a 2-octave chromatic keyboard,
   velocity from the slider, joystick = pitch bend / mod. REC-arm + play
-  records quantized notes into the pattern.
+  records quantized notes into the pattern. On **drum tracks**
+  (DrumSynth/DrumRack/DrumSlop) the 27 keys instead walk the
+  instrument's drum voices left→right (whites and interleaved blacks as
+  one physical strip, position modulo voice count — wraps at the end,
+  so every key always sounds); toasts show the voice name.
 - **Sound**: yawn engine instruments (SubtractiveSynth, DrumRack, FM,
   Wavetable, Granular, …) + one insert FX slot per track (29 effect types).
 - **Sampling**: SAMPLE page — record from mic/line-in, trim, normalize,
@@ -166,6 +170,29 @@ PortAudio callback status flags (xrun bits) once per second, then exits
 - **Track select**: S3/S4 (TRK-/TRK+) or Shift + white keys 1–4;
   Shift + white 5–8 = mute.
 
+### Drum editing (INST page on drum tracks)
+
+For pad instruments (DrumSynth / DrumRack / DrumSlop) the INST page
+edits the **last-played pad**: hitting a key in play mode (or a
+hold-step voice p-lock) makes that voice the edit pad — the header
+shows it (`SNARE T1 140`), an `EDIT SNARE` toast confirms, and all
+bindings rebuild to that voice. Sequencer playback never steals the
+edit focus.
+
+- **Encoder pages**: PAD / PAD2 = the edited pad's params (DrumSynth:
+  Tune/Drive, kick adds Sine/White/Pink; DrumRack: Pad Vol/Pan/Pitch/
+  Choke/Start/End; DrumSlop: Pad Vol/Pan/Pitch/Rev/Cutoff/Reso),
+  KIT = instrument globals (Volume, OS 2×, slice controls). S2 = PG+
+  cycles them.
+- **Macro encoders 5–8** (factory binding): A/D = the edited pad's
+  attack/decay (S/R also bound on DrumSlop). Pots stay inert on
+  DrumSynth/DrumRack (CUT/RES bind only where the instrument exposes
+  them — DrumSlop pads).
+- DrumSynth has no selected-slot concept — its 36 params are globally
+  indexed per voice (kick = 7 @ index 0, others = 4 @ 7+(slot−1)·4),
+  so the edit pad is pure index arithmetic; DrumRack/DrumSlop get the
+  pad via their `selectedPad` setter.
+
 ### Scripted test / asset modes
 
 ```
@@ -181,6 +208,8 @@ groovebox_sim --revbtest    NSR-1 rev B: step row, p-lock, scale lock (6/6)
 groovebox_sim --macrotest   macro encoder assign/bind/reset/persist (6/6)
 groovebox_sim --tracktest   engine tracks, INST swap, MFX, type toggle (4/4)
 groovebox_sim --bouncetest  clip record, bounce, FX slot 2 (7/7)
+groovebox_sim --drumtest    drum key map: voices, wrap, p-lock (9/9)
+groovebox_sim --padtest     last-played-pad edit focus (8/8)
 groovebox_sim --panel=nsr2 --panelprobe  synthetic mouse on NSR-2 (3/3)
 groovebox_sim --widgets     widget showcase → docs/widgets.png
 groovebox_sim --profile 10  heavy-load profiling: CPU% + xrun flags/s

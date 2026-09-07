@@ -97,9 +97,15 @@ void Ui::drawHeader(const UiState& s, uint16_t* fb) {
                     : (s.scaleLock == 2 ? "CHRM" : "MAJ"),
              kColBlack);
     }
-    // right-aligned track + BPM
-    char right[16];
-    std::snprintf(right, sizeof(right), "T%d %d", s.track + 1, int(s.bpm + 0.5));
+    // right-aligned track + BPM (INST page on drum tracks: the edit
+    // pad — last-played voice — leads the block, e.g. "SNARE T1 120")
+    char right[24];
+    if (s.page == 0 && s.padName)
+        std::snprintf(right, sizeof(right), "%s T%d %d", s.padName,
+                      s.track + 1, int(s.bpm + 0.5));
+    else
+        std::snprintf(right, sizeof(right), "T%d %d", s.track + 1,
+                      int(s.bpm + 0.5));
     text(fb, kDisplayW - textWidth(right, 2) - 4, 1, 2, right, kColBlack);
 }
 
@@ -136,6 +142,13 @@ void Ui::pageSynth(const UiState& s, uint16_t* fb) {
     if (s.overlayLine) {
         text(fb, (kDisplayW - textWidth(s.overlayLine, 1)) / 2, 132, 1,
              s.overlayLine, kColWhite);
+    }
+    // chooser overlay (instrument picker)
+    if (s.chooserOpen && s.chooserItems) {
+        Canvas565 c{fb, kDisplayW, kDisplayH};
+        ListWidget list{56, 24, 128, 96, s.chooserItems, s.chooserCount,
+                        s.chooserSel, s.chooserScroll};
+        list.draw(c, m_font);
     }
 }
 
