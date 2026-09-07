@@ -25,19 +25,27 @@
 //   --fontchart / --widgets  PNG review renderers, no engine.
 
 #include "hal.h"
+#ifdef GB_PI_BACKEND
+#include "PiBackend.h" // headless Pi: fbdev display + RtMidi panel
+#else
 #include "SimBackend.h"
+#endif
 #include "ui.h"
 #include "fontchart.h"
 #include "widgetshowcase.h"
 #include "pattern.h"
 #include "PanelView.h"
+#include "PanelViewNSR2.h" // was transitive via SimBackend.h
 #include "capture.h"
 #include "sampleio.h"
 
 #include "stb_image_write.h" // implementation TU: fontchart.cpp
+#ifndef GB_PI_BACKEND
 #include <SDL3/SDL.h>        // --panelprobe injects synthetic mouse events
+#endif
 
 #include "audio/AudioEngine.h"
+#include "audio/OfflineRenderer.h"
 #include "util/Factory.h"
 #include "util/MessageQueue.h"
 #include "midi/MidiTypes.h"
@@ -61,12 +69,22 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <memory>
 #include <thread>
 #include <variant>
 #include <vector>
+
+// Backend selection (see emulator/CMakeLists.txt GB_PI_BACKEND): the
+// SDL3 sim on desktop, the headless fbdev+RtMidi backend on the Pi.
+// Both implement the gb::Hal interface from hal.h.
+#ifdef GB_PI_BACKEND
+using HalBackend = gb::PiBackend;
+#else
+using HalBackend = gb::SimBackend;
+#endif
 
 namespace {
 
@@ -77,71 +95,47 @@ const char* noteName(int note, char* buf, size_t n) {
     return buf;
 }
 
-// Synthesize a minimal default kit so the DrumRack is audible without
-// loading sample files: kick 36 (C2), hat 38 (D2), clap 39 (D#2),
-// snare 40 (E2).
-void loadDefaultDrums(yawn::instruments::DrumRack* rack, double sr) {
-    {   // kick: decaying sine with downward pitch sweep
-        const int frames = int(sr * 0.30);
-        std::vector<float> buf(size_t(frames) * 2);
-        double phase = 0.0;
-        for (int i = 0; i < frames; ++i) {
-            const double t = i / sr;
+// Synthesized drum one-shots (M2d: one pad per per-track DrumRack —
+// T2 kick@36, T3 hat@38, T4 clap@39).
+std::vector<float> makeDrumSample(int kind, double sr) {
+    std::vector<float> buf;
+    uint32_t rng = 22222 + uint32_t(kind) * 7777;
+    auto noise = [&rng] {
+        rng = rng * 1664525u + 1013904223u;
+        return int(rng >> 16) / 32768.0 - 1.0;
+    };
+    int frames = 0;
+    switch (kind) {
+    case 0: frames = int(sr * 0.30); break;  // kick
+    case 1: frames = int(sr * 0.06); break;  // hat
+    case 2: frames = int(sr * 0.25); break;  // clap
+    default: frames = int(sr * 0.18); break; // snare
+    }
+    buf.resize(size_t(frames) * 2);
+    double phase = 0.0;
+    for (int i = 0; i < frames; ++i) {
+        const double t = i / sr;
+        float s = 0.0f;
+        if (kind == 0) {      // kick: swept decaying sine
             const double freq = 40.0 + 90.0 * std::exp(-t * 25.0);
             phase += 2.0 * 3.14159265358979 * freq / sr;
-            const float s = float(std::sin(phase) * std::exp(-t * 11.0) * 0.9);
-            buf[size_t(i) * 2] = buf[size_t(i) * 2 + 1] = s;
-        }
-        rack->loadPad(36, buf.data(), frames, 2);
-    }
-    {   // hat: short decaying noise burst
-        const int frames = int(sr * 0.06);
-        std::vector<float> buf(size_t(frames) * 2);
-        uint32_t rng = 22222;
-        for (int i = 0; i < frames; ++i) {
-            const double t = i / sr;
-            rng = rng * 1664525u + 1013904223u;
-            const float s = float((int(rng >> 16) / 32768.0 - 1.0) *
-                                  std::exp(-t * 90.0) * 0.4);
-            buf[size_t(i) * 2] = buf[size_t(i) * 2 + 1] = s;
-        }
-        rack->loadPad(38, buf.data(), frames, 2);
-    }
-    {   // clap: three short noise bursts then a longer tail
-        const int frames = int(sr * 0.25);
-        std::vector<float> buf(size_t(frames) * 2);
-        uint32_t rng = 777;
-        for (int i = 0; i < frames; ++i) {
-            const double t = i / sr;
-            rng = rng * 1664525u + 1013904223u;
-            const double n = int(rng >> 16) / 32768.0 - 1.0;
+            s = float(std::sin(phase) * std::exp(-t * 11.0) * 0.9);
+        } else if (kind == 1) // hat: short noise burst
+            s = float(noise() * std::exp(-t * 90.0) * 0.4);
+        else if (kind == 2) { // clap: three bursts + tail
             const double burst = std::fmod(t, 0.03) < 0.012 && t < 0.09
                                      ? 1.0 : std::exp(-(t - 0.09) * 30.0);
-            const float s = float(n * burst * 0.5);
-            buf[size_t(i) * 2] = buf[size_t(i) * 2 + 1] = s;
-        }
-        rack->loadPad(39, buf.data(), frames, 2);
-    }
-    {   // snare: 180 Hz body + noise top
-        const int frames = int(sr * 0.18);
-        std::vector<float> buf(size_t(frames) * 2);
-        uint32_t rng = 4242;
-        for (int i = 0; i < frames; ++i) {
-            const double t = i / sr;
-            rng = rng * 1664525u + 1013904223u;
-            const double n = int(rng >> 16) / 32768.0 - 1.0;
+            s = float(noise() * burst * 0.5);
+        } else {              // snare: 180 Hz body + noise top
             const double body = std::sin(2.0 * 3.14159265358979 * 180.0 * t) *
                                 std::exp(-t * 25.0);
-            const float s = float((body * 0.6 + n * std::exp(-t * 20.0) * 0.4)
-                                  * 0.6);
-            buf[size_t(i) * 2] = buf[size_t(i) * 2 + 1] = s;
+            s = float((body * 0.6 + noise() * std::exp(-t * 20.0) * 0.4) *
+                      0.6);
         }
-        rack->loadPad(40, buf.data(), frames, 2);
+        buf[size_t(i) * 2] = buf[size_t(i) * 2 + 1] = s;
     }
-    std::printf("[engine] DrumRack: default kit loaded "
-                "(kick=36, hat=38, clap=39, snare=40)\n");
+    return buf;
 }
-
 } // namespace
 
 class App : public gb::HalHandler {
@@ -151,6 +145,7 @@ public:
         m_winSize = m_nsr2 ? 8 : 16;
         if (m_nsr2) m_velSource = 1; // NSR-2 default: fixed 100
     }
+    void setProfileSeconds(int s) { m_profileSecs = s; }
 
     // testMode: 0 = interactive, 1 = --smoke, 2 = --seqtest
     int run(int testMode) {
@@ -166,7 +161,9 @@ public:
                     : testMode == 7 ? " (sample/settings test)"
                     : testMode == 8 ? " (NSR-2 grid test)"
                     : testMode == 9 ? " (NSR-1 rev B test)"
-                    : testMode == 10 ? " (macro encoder test)" : "");
+                    : testMode == 10 ? " (macro encoder test)"
+                    : testMode == 11 ? " (track/channel test)"
+                    : testMode == 12 ? " (bounce/clip test)" : "");
 
         if (!m_hal.init(*this)) return 1;
 
@@ -186,17 +183,26 @@ public:
         }
         std::printf("[engine] started on default output device\n");
 
+        // M2d: one engine track per UI track. T1 = SubtractiveSynth;
+        // T2/T3/T4 each a DrumRack with its synthesized one-shot.
         m_engine->setInstrument(0, yawn::createInstrument("subsynth"));
-        m_engine->setInstrument(1, yawn::createInstrument("drumrack"));
         m_engine->sendCommand(yawn::audio::SetTrackTypeMsg{0, 1}); // MIDI
-        m_engine->sendCommand(yawn::audio::SetTrackTypeMsg{1, 1}); // MIDI
+        static const char* kDrumNames[3] = {"kick", "hat", "clap"};
+        for (int t = 1; t < 4; ++t) {
+            auto rack = yawn::createInstrument("drumrack");
+            auto* r = dynamic_cast<yawn::instruments::DrumRack*>(
+                rack.get());
+            if (r) {
+                auto smp = makeDrumSample(t - 1, m_engine->sampleRate());
+                r->loadPad(gb::Pattern::kPadNote[t], smp.data(),
+                           int(smp.size()) / 2, 2);
+            }
+            m_engine->setInstrument(t, std::move(rack));
+            m_engine->sendCommand(yawn::audio::SetTrackTypeMsg{t, 1});
+        }
         m_engine->sendCommand(yawn::audio::TransportSetBPMMsg{m_state.bpm});
-        std::printf("[engine] track 0: SubtractiveSynth (T1), track 1: "
-                    "DrumRack (T2 kick/T3 hat/T4 clap)\n");
-
-        if (auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
-                m_engine->instrument(1)))
-            loadDefaultDrums(rack, m_engine->sampleRate());
+        std::printf("[engine] tracks 0-3: T1=SubtractiveSynth, "
+                    "T2=kick T3=hat T4=clap (one DrumRack each)\n");
 
         // Bind pot/encoder params by name and sync the panel to the
         // engine: pots start engaged at the panel's default positions
@@ -221,6 +227,12 @@ public:
         for (const auto& d : yawn::audioEffectDescriptors())
             m_fxItems.push_back(d.displayName);
         m_fxItems.push_back("NONE");
+        for (const auto& d : yawn::instrumentDescriptors())
+            m_instItems.push_back(d.displayName);
+        m_instItems.push_back("KEEP");
+        for (const auto& d : yawn::midiEffectDescriptors())
+            m_mfxItems.push_back(d.displayName);
+        m_mfxItems.push_back("NONE");
         m_state.chooserItems = m_fxItems.data();
         m_state.chooserCount = int(m_fxItems.size());
 
@@ -236,6 +248,19 @@ public:
         m_state.seq.rows = gb::Pattern::kTracks; m_state.seq.rowH = 16;
         m_state.lane.x = 24; m_state.lane.y = 104;
         setPage(testMode == 2 ? 1 : 0);
+
+        // --profile N: heavy-load harness runs INSTEAD of the
+        // interactive/test loop, then falls through to shutdown.
+        if (m_profileSecs > 0) {
+            const int rc = runProfile(m_profileSecs);
+            std::printf("[engine] stopping...\n");
+            m_engine->stop();
+            m_engine->shutdown();
+            m_hal.shutdown();
+            std::printf("[engine] shutdown complete\n");
+            std::fflush(stdout);
+            return rc;
+        }
 
         // ── Main loop ───────────────────────────────────────────────
         std::printf("[app] running — %s\n",
@@ -336,12 +361,14 @@ public:
         if (m_testMode == 8) return nsr2testVerdict();
         if (m_testMode == 9) return revbtestVerdict();
         if (m_testMode == 10) return macrotestVerdict();
+        if (m_testMode == 11) return tracktestVerdict();
+        if (m_testMode == 12) return bouncetestVerdict();
         return 0;
     }
 
     // ── HalHandler ──────────────────────────────────────────────────
     void onQuit() override {
-        if (m_testMode) { m_running = false; return; }
+        if (m_testMode || m_profileSecs > 0) { m_running = false; return; }
         if (m_confirmAction == 0) openConfirm(2); // ESC asks first
         else closeConfirm();                      // ESC again = cancel
     }
@@ -493,7 +520,7 @@ public:
         }
         // FX chooser: encoder 1 scrolls the list.
         if (m_state.chooserOpen) {
-            if (index == 0) fxChooserScroll(delta);
+            if (index == 0) chooserScroll(delta);
             return;
         }
         // Macro ASSIGN mode: turning a pageable encoder (1-4, SYNTH
@@ -540,13 +567,48 @@ public:
                         double(m_vol[index]));
             break;
         }
-        case 3: { // FX: encoders edit the first 4 effect params
+        case 3: { // FX: encoders edit the first 4 effect params (slot)
             auto* fx = fxOnSelectedTrack();
             if (fx && index < fx->parameterCount())
                 editFxParam(fx, index,
                             shiftHeld() ? delta / 128.0f : delta / 16.0f);
             break;
         }
+        case 7: { // MFX: encoders edit the first 4 MIDI-effect params
+            auto* fx = m_engine->midiEffectChain(m_state.track).effect(0);
+            if (fx && index < fx->parameterCount()) {
+                const auto& pi = fx->parameterInfo(index);
+                const float range = pi.maxValue - pi.minValue;
+                float norm = range > 0.0f
+                    ? (fx->getParameter(index) - pi.minValue) / range
+                    : 0.0f;
+                norm = std::max(0.0f, std::min(1.0f,
+                    norm + (shiftHeld() ? delta / 128.0f : delta / 16.0f)));
+                fx->setParameter(index, pi.minValue + norm * range);
+                char vb[16];
+                formatParam(pi, norm, vb, sizeof(vb));
+                toastLow(pi.name, vb);
+                std::printf("[mfx] %s = %s\n", pi.name, vb);
+            }
+            break;
+        }
+        case 8:   // TRACK: VOL / PAN / input channel
+            if (index == 0) {
+                m_trackVol = std::max(0.0f, std::min(1.0f,
+                    m_trackVol + delta * 0.05f));
+                m_engine->sendCommand(yawn::audio::SetTrackVolumeMsg{
+                    m_state.track, m_trackVol});
+            } else if (index == 1) {
+                m_trackPan = std::max(-1.0f, std::min(1.0f,
+                    m_trackPan + delta * 0.05f));
+                m_engine->sendCommand(yawn::audio::SetTrackPanMsg{
+                    m_state.track, m_trackPan});
+            } else if (index == 2) {
+                m_trackInputCh = (m_trackInputCh + delta + 4) % 4;
+                m_engine->sendCommand(yawn::audio::SetTrackAudioInputChMsg{
+                    m_state.track, m_trackInputCh});
+            }
+            break;
         case 4:   // SAMPLE: trim start/end, gain (review state only)
             if (m_sampleState == 2 && m_takeLen > 0) {
                 if (index == 0) {
@@ -628,25 +690,26 @@ private:
         const char* enc[4];
         const char* soft[4];
     };
-    // Page indices into UiState::page.
-    static constexpr int kNumPages = 7;
+    // Page IDs (internal, stable): 0 INST, 1 SEQ, 2 MIXER, 3 FX,
+    // 4 SAMPLE, 5 LOAD, 6 SET, 7 MFX, 8 TRACK.
+    // Cycle order (M2d): SEQ / INST / MFX / FX / MIX / SAMPLE / LOAD /
+    // SET / TRACK.
+    static constexpr int kNumPages = 9;
     inline static const PageDef kPages[kNumPages] = {
-        // SYNTH/FX encoder labels are dynamic (bound param names).
-        {"SYNTH", {"", "", "", ""},
-                  {"OCT-", "PG+", "TRK-", "TRK+"}},
-        {"SEQ",   {"NTE", "GTE", "BPM", ""},
-                  {"LEN", "4FLR", "TRK-", "TRK+"}},
-        {"MIXER", {"LV1", "LV2", "LV3", "LV4"},
-                  {"MUTE", "-", "TRK-", "TRK+"}},
-        {"FX",    {"", "", "", ""},
-                  {"LOAD", "BYP", "TRK-", "TRK+"}},
-        {"SAMPLE", {"TRIM-", "TRIM+", "GAIN", ""},
-                  {"REC", "STOP", "NORM", "ASSIGN"}},
-        {"LOAD",  {"SEL", "", "", ""},
-                  {"OPEN", "UP", "TRK-", "TRK+"}},
-        {"SET",   {"SEL", "ADJ", "", ""},
-                  {"ADJ", "SAVE", "TRK-", "TRK+"}},
+        // INST/FX/MFX encoder labels are dynamic (bound param names).
+        {"INST",   {"", "", "", ""}, {"INST", "PG+", "TRK-", "TRK+"}},
+        {"SEQ",    {"NTE", "GTE", "BPM", ""}, {"LEN", "4FLR", "TRK-", "TRK+"}},
+        {"MIXER",  {"LV1", "LV2", "LV3", "LV4"}, {"MUTE", "-", "TRK-", "TRK+"}},
+        {"FX",     {"", "", "", ""}, {"LOAD", "BYP", "TRK-", "TRK+"}},
+        {"SAMPLE", {"TRIM-", "TRIM+", "GAIN", ""}, {"REC", "STOP", "NORM", "ASSIGN"}},
+        {"LOAD",   {"SEL", "", "", ""}, {"OPEN", "UP", "TRK-", "TRK+"}},
+        {"SET",    {"SEL", "ADJ", "", ""}, {"ADJ", "SAVE", "TRK-", "TRK+"}},
+        {"MFX",    {"", "", "", ""}, {"LOAD", "BYP", "TRK-", "TRK+"}},
+        {"TRACK",  {"VOL", "PAN", "IN", ""}, {"TYP", "MON", "BOUNCE", "TRK+"}},
     };
+    // prevNext cycles in this order
+    inline static const int kPageOrder[kNumPages] =
+        {1, 0, 7, 3, 2, 4, 5, 6, 8};
 
     void setPage(int p) {
         if (p != m_state.page)          // real page change re-arms
@@ -670,17 +733,21 @@ private:
             }
             return;
         }
-        // S3/S4 = TRK-/TRK+ on all pages EXCEPT SAMPLE (S3=NORM,
-        // S4=ASSIGN there — no TRK on that page).
-        if (i == 2 && m_state.page != 4) { trackCycle(-1); return; }
+        // S3/S4 = TRK-/TRK+ on most pages; SAMPLE (S3=NORM, S4=ASSIGN)
+        // and TRACK (S3=BOUNCE) opt out.
+        if (i == 2 && m_state.page != 4 && m_state.page != 8) {
+            trackCycle(-1); return;
+        }
         if (i == 3 && m_state.page != 4) { trackCycle(+1); return; }
         switch (m_state.page) {
-        case 0: // SYNTH: S1 = OCT- (shift+S1 = OCT+), S2 = param page
+        case 0: // INST: S1 = instrument picker, S2 = param page,
+                //        shift+S1 = OCT-, shift+S2 = OCT+
             if (i == 0) {
-                if (shiftHeld()) setOctave(+1);
-                else             setOctave(-1);
+                if (shiftHeld()) setOctave(-1);
+                else             chooserKey(1); // instrument picker
             } else if (i == 1) {
-                nextEncPage(+1); // cycles non-empty pages only
+                if (shiftHeld()) setOctave(+1);
+                else             nextEncPage(+1);
             }
             break;
         case 1: // SEQ: S1 = LEN (shift+S1 = CLR), S2 = 4FLR
@@ -704,9 +771,15 @@ private:
         case 2: // MIXER: S1 = mute selected track
             if (i == 0) muteTrack(m_state.track);
             break;
-        case 3: // FX: S1 = chooser open/confirm, S2 = cancel/bypass
-            if (i == 0)      fxChooserKey();
-            else if (i == 1) fxBypassKey();
+        case 3: // FX: S1 = chooser, S2 = bypass (shift+S2 = slot 1/2)
+            if (i == 0)      chooserKey(0);
+            else if (i == 1) {
+                if (shiftHeld()) {
+                    m_fxSlot ^= 1;
+                    std::printf("[fx] slot -> %d\n", m_fxSlot + 1);
+                    toast("FX SLOT", m_fxSlot ? "2" : "1");
+                } else fxBypassKey();
+            }
             break;
         case 4: // SAMPLE: REC/STOP/NORM/ASSIGN
             if (i == 0)      sampleRecToggle();
@@ -722,6 +795,15 @@ private:
             if (i == 0)      settingsAdjust(+1);
             else if (i == 1) saveSettings();
             break;
+        case 7: // MFX: S1 = chooser, S2 = bypass
+            if (i == 0)      chooserKey(2);
+            else if (i == 1) mfxBypassKey();
+            break;
+        case 8: // TRACK: S1 = type, S2 = monitor, S3 = bounce
+            if (i == 0)      trackTypeToggle();
+            else if (i == 1) trackMonitorToggle();
+            else if (i == 2) bounceTrack(m_state.track);
+            break;
         }
     }
 
@@ -735,7 +817,12 @@ private:
             if (m_state.page == 1) pageWindow(dir);  // SEQ: step window
             else setBpm(m_state.bpm + dir);          // elsewhere: BPM
         } else {
-            setPage((m_state.page + dir + kNumPages) % kNumPages);
+            // cycle order table (SEQ/INST/MFX/FX/MIX/SAMPLE/LOAD/SET/TRACK)
+            int pos = 0;
+            for (int i = 0; i < kNumPages; ++i)
+                if (kPageOrder[i] == m_state.page) { pos = i; break; }
+            pos = (pos + dir + kNumPages) % kNumPages;
+            setPage(kPageOrder[pos]);
         }
     }
 
@@ -828,7 +915,7 @@ private:
         // pad — point it at this track's lane.
         if (t > 0)
             if (auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
-                    m_engine->instrument(1)))
+                    m_engine->instrument(m_state.track)))
                 rack->setSelectedPad(gb::Pattern::kPadNote[t]);
         rebindParams(); // name-lookup bindings + pickup re-arm
         std::printf("[panel] track select -> T%d (%s)\n", t + 1,
@@ -839,11 +926,11 @@ private:
 
     void muteTrack(int t) {
         m_muted[t] = !m_muted[t];
-        // Drum lanes (T2-4) share yawn track 1, so their mute is
-        // scheduler-side (skip firing). T1 also mutes the engine track.
-        if (t == 0)
-            m_engine->sendCommand(yawn::audio::SetTrackMuteMsg{
-                0, m_muted[0]});
+        // M2d: one engine track per UI track — mute goes through the
+        // engine for all tracks; the scheduler also skips firing so
+        // the log/test path stays deterministic.
+        m_engine->sendCommand(yawn::audio::SetTrackMuteMsg{
+            t, m_muted[t]});
         std::printf("[panel] T%d %s\n", t + 1,
                     m_muted[t] ? "MUTED" : "unmuted");
     }
@@ -978,9 +1065,12 @@ private:
         if (m_engine->transport().isPlaying()) {
             m_engine->sendCommand(yawn::audio::TransportStopMsg{});
             allNotesOff();
+            recordArmAudioStop(); // finalize a clip recording
             std::printf("[engine] transport STOP\n");
         } else {
+            launchPendingClips(); // before PLAY so clips start on time
             m_engine->sendCommand(yawn::audio::TransportPlayMsg{});
+            recordArmAudioStart(); // REC-armed AUDIO track captures input
             std::printf("[engine] transport PLAY\n");
         }
     }
@@ -989,6 +1079,7 @@ private:
         m_engine->sendCommand(yawn::audio::TransportStopMsg{});
         m_engine->sendCommand(yawn::audio::TransportSetPositionMsg{0});
         allNotesOff();
+        recordArmAudioStop();
         std::printf("[engine] transport STOP + return-to-zero\n");
     }
 
@@ -1582,11 +1673,11 @@ private:
         std::printf("[panel] ENC %s = %s\n", pi.name, vb);
     }
 
-    // ── FX (one insert slot per engine track) ───────────────────────
+    // ── FX (two insert slots per UI track) / MFX / INST chooser ─────
     yawn::effects::AudioEffect* fxOnSelectedTrack() {
         return m_engine->mixer()
             .trackEffects(gb::Pattern::engineTrack(m_state.track))
-            .effectAt(0);
+            .effectAt(m_fxSlot);
     }
 
     void editFxParam(yawn::effects::AudioEffect* fx, int pidx,
@@ -1603,42 +1694,99 @@ private:
         std::printf("[panel] FX %s = %s\n", pi.name, vb);
     }
 
-    void fxChooserKey() {
+    // Unified chooser: kind 0 = audio FX insert, 1 = instrument swap,
+    // 2 = MIDI effect. S1 opens/confirms, S2 cancels.
+    void chooserKey(int kind) {
         auto& ch = m_state;
         if (!ch.chooserOpen) {
+            m_chooserKind = kind;
             ch.chooserOpen = true;
             ch.chooserSel = 0;
             ch.chooserScroll = 0;
-            std::printf("[fx] chooser open (%d effects + NONE)\n",
-                        int(yawn::audioEffectDescriptors().size()));
+            ch.chooserItems = kind == 0 ? m_fxItems.data()
+                            : kind == 1 ? m_instItems.data()
+                                        : m_mfxItems.data();
+            ch.chooserCount = int(kind == 0 ? m_fxItems.size()
+                              : kind == 1 ? m_instItems.size()
+                                          : m_mfxItems.size());
+            static const char* kWhat[3] = {"FX", "INST", "MFX"};
+            std::printf("[ui] %s chooser open (%d entries)\n",
+                        kWhat[kind], ch.chooserCount);
             return;
         }
-        // confirm
-        const auto& descs = yawn::audioEffectDescriptors();
-        auto& chain = m_engine->mixer()
-            .trackEffects(gb::Pattern::engineTrack(m_state.track));
-        if (ch.chooserSel >= int(descs.size())) { // "NONE" entry
-            if (chain.effectAt(0)) {
-                chain.removeRetired(0);
-                std::printf("[fx] T%d effect removed\n", m_state.track + 1);
-            }
-        } else {
-            auto fx = yawn::createAudioEffect(descs[ch.chooserSel].id);
-            if (fx) {
-                chain.insert(0, std::move(fx));
-                std::printf("[fx] T%d <- %s\n", m_state.track + 1,
-                            descs[ch.chooserSel].displayName);
-                toast("FX", descs[ch.chooserSel].displayName);
-            }
-        }
-        ch.chooserOpen = false;
+        chooserConfirm();
     }
 
-    void fxChooserScroll(int delta) {
+    void chooserConfirm() {
         auto& ch = m_state;
-        const int count = int(yawn::audioEffectDescriptors().size()) + 1;
+        const int sel = ch.chooserSel;
+        ch.chooserOpen = false;
+        const int t = m_state.track;
+        if (m_chooserKind == 0) {
+            const auto& descs = yawn::audioEffectDescriptors();
+            auto& chain = m_engine->mixer()
+                .trackEffects(gb::Pattern::engineTrack(t));
+            if (sel >= int(descs.size())) {
+                if (chain.effectAt(m_fxSlot)) {
+                    chain.removeRetired(m_fxSlot);
+                    std::printf("[fx] T%d slot %d cleared\n", t + 1,
+                                m_fxSlot + 1);
+                }
+            } else {
+                auto fx = yawn::createAudioEffect(descs[sel].id);
+                if (fx) {
+                    chain.insert(m_fxSlot, std::move(fx));
+                    std::printf("[fx] T%d slot %d <- %s\n", t + 1,
+                                m_fxSlot + 1, descs[sel].displayName);
+                    toast("FX", descs[sel].displayName);
+                }
+            }
+        } else if (m_chooserKind == 1) {
+            const auto& descs = yawn::instrumentDescriptors();
+            if (sel >= int(descs.size())) return; // KEEP entry
+            const char* id = descs[sel].id;
+            m_trackInstId[t] = id;
+            m_trackType[t] = 1; // instrument swap implies MIDI track
+            m_engine->sendCommand(yawn::audio::SetTrackTypeMsg{t, 1});
+            m_engine->setInstrument(t, yawn::createInstrument(id));
+            if (std::strcmp(id, "drumrack") == 0)
+                if (auto* r = dynamic_cast<yawn::instruments::DrumRack*>(
+                        m_engine->instrument(t))) {
+                    auto smp = makeDrumSample(t - 1, m_engine->sampleRate());
+                    r->loadPad(gb::Pattern::kPadNote[t], smp.data(),
+                               int(smp.size()) / 2, 2);
+                }
+            // fresh instrument: macros reset to factory ADSR, all
+            // bindings rebuilt from its parameterInfo
+            for (int i = 0; i < 4; ++i) m_macroParamByTrack[t][i] = -1;
+            rebindParams();
+            std::printf("[inst] T%d <- %s\n", t + 1,
+                        descs[sel].displayName);
+            toast("INST", descs[sel].displayName);
+        } else {
+            const auto& descs = yawn::midiEffectDescriptors();
+            auto& chain = m_engine->midiEffectChain(t);
+            if (sel >= int(descs.size())) {
+                if (chain.effect(0)) {
+                    chain.removeEffectRetired(0);
+                    std::printf("[mfx] T%d cleared\n", t + 1);
+                }
+            } else {
+                auto fx = yawn::createMidiEffect(descs[sel].id);
+                if (fx && chain.addEffect(std::move(fx))) {
+                    std::printf("[mfx] T%d <- %s\n", t + 1,
+                                descs[sel].displayName);
+                    toast("MFX", descs[sel].displayName);
+                }
+            }
+        }
+    }
+
+    void chooserScroll(int delta) {
+        auto& ch = m_state;
+        const int count = ch.chooserCount;
+        if (count <= 0) return;
         ch.chooserSel = (ch.chooserSel + delta + count) % count;
-        // keep selection visible in the 11-row list
         const int rows = 11;
         if (ch.chooserSel < ch.chooserScroll)
             ch.chooserScroll = ch.chooserSel;
@@ -1649,13 +1797,215 @@ private:
     void fxBypassKey() {
         if (m_state.chooserOpen) { // cancel
             m_state.chooserOpen = false;
-            std::printf("[fx] chooser cancelled\n");
+            std::printf("[ui] chooser cancelled\n");
             return;
         }
         if (auto* fx = fxOnSelectedTrack()) {
             fx->setBypassed(!fx->bypassed());
-            std::printf("[fx] T%d %s %s\n", m_state.track + 1, fx->name(),
+            std::printf("[fx] T%d slot %d %s %s\n", m_state.track + 1,
+                        m_fxSlot + 1, fx->name(),
                         fx->bypassed() ? "BYPASSED" : "active");
+        }
+    }
+
+    void mfxBypassKey() {
+        if (m_state.chooserOpen) {
+            m_state.chooserOpen = false;
+            return;
+        }
+        auto& chain = m_engine->midiEffectChain(m_state.track);
+        if (auto* fx = chain.effect(0)) {
+            fx->setBypassed(!fx->bypassed());
+            std::printf("[mfx] T%d %s %s\n", m_state.track + 1, fx->name(),
+                        fx->bypassed() ? "BYPASSED" : "active");
+        }
+    }
+
+    // ── TRACK page: channel type, monitor, bounce ───────────────────
+    void trackTypeToggle() {
+        const int t = m_state.track;
+        if (m_trackType[t] == 1) { // MIDI -> AUDIO
+            m_trackType[t] = 0;
+            m_engine->sendCommand(yawn::audio::SetTrackTypeMsg{t, 0});
+            m_engine->setInstrument(t, nullptr); // audio track: no inst
+            std::printf("[track] T%d -> AUDIO (instrument removed)\n",
+                        t + 1);
+        } else {                   // AUDIO -> MIDI: restore instrument
+            m_trackType[t] = 1;
+            m_engine->sendCommand(yawn::audio::SetTrackTypeMsg{t, 1});
+            m_engine->setInstrument(t,
+                yawn::createInstrument(m_trackInstId[t]));
+            if (m_trackInstId[t] == "drumrack")
+                if (auto* r = dynamic_cast<yawn::instruments::DrumRack*>(
+                        m_engine->instrument(t))) {
+                    auto smp = makeDrumSample(t - 1, m_engine->sampleRate());
+                    r->loadPad(gb::Pattern::kPadNote[t], smp.data(),
+                               int(smp.size()) / 2, 2);
+                }
+            std::printf("[track] T%d -> MIDI (%s)\n", t + 1,
+                        m_trackInstId[t].c_str());
+        }
+        for (int i = 0; i < 4; ++i) m_macroParamByTrack[t][i] = -1;
+        rebindParams();
+        saveSettings();
+    }
+
+    void trackMonitorToggle() {
+        m_trackMonitor = !m_trackMonitor;
+        m_engine->sendCommand(yawn::audio::SetTrackMonitorMsg{
+            m_state.track, uint8_t(m_trackMonitor ? 1 : 2)});
+        std::printf("[track] T%d monitor %s\n", m_state.track + 1,
+                    m_trackMonitor ? "IN" : "OFF");
+    }
+
+    // Bounce: render this (MIDI) track's pattern offline to a WAV and
+    // load it as a looping clip on the first AUDIO track, then mute
+    // the source. Blocks briefly (offline render is non-RT by design).
+    void bounceTrack(int src) {
+        if (m_trackType[src] != 1) {
+            toast("BOUNCE", "MIDI ONLY");
+            return;
+        }
+        int dst = -1;
+        for (int t = 0; t < 4; ++t)
+            if (t != src && m_trackType[t] == 0) { dst = t; break; }
+        if (dst < 0) {
+            toast("BOUNCE", "NO AUDIO TRK");
+            std::printf("[bounce] T%d: no AUDIO track to land on\n",
+                        src + 1);
+            return;
+        }
+        stopTransport();
+        allNotesOff();
+        // render only the source track: mute the others during the
+        // offline render (they keep playing clips/notes otherwise);
+        // restored after — the source itself is muted at the end.
+        for (int t = 0; t < 4; ++t)
+            if (t != src && !m_muted[t])
+                m_engine->sendCommand(yawn::audio::SetTrackMuteMsg{t, true});
+        const double beats = m_pattern.length / 4.0;
+        yawn::audio::RenderConfig rcfg{0.0, beats, 48000, 2};
+        yawn::audio::RenderProgress prog;
+        m_bounceLast = -1;
+        m_bounceLive.active = false;
+        std::printf("[bounce] rendering T%d pattern (%.1f beats)...\n",
+                    src + 1, beats);
+        auto buf = yawn::audio::OfflineRenderer::render(
+            *m_engine, rcfg, prog,
+            [this, src](double beat) {
+                // fire the pattern's steps on the source track
+                const int64_t absStep = int64_t(beat * 4.0);
+                if (absStep != m_bounceLast) {
+                    m_bounceLast = absStep;
+                    const int step = int(absStep % m_pattern.length);
+                    const auto& st = m_pattern.steps[src][step];
+                    if (st.on) {
+                        const int note = m_pattern.noteForStep(src, step);
+                        m_engine->sendCommand(yawn::audio::SendMidiToTrackMsg{
+                            src, uint8_t(yawn::midi::MidiMessage::Type::NoteOn),
+                            0, uint8_t(note),
+                            yawn::midi::Convert::vel7to16(
+                                st.accent ? 127 : st.vel), 0});
+                        m_bounceLive = {true, note,
+                                        beat + 0.25 *
+                                            m_pattern.gateForStep(src, step)};
+                    }
+                }
+                if (m_bounceLive.active && beat >= m_bounceLive.offBeat) {
+                    m_engine->sendCommand(yawn::audio::SendMidiToTrackMsg{
+                        src, uint8_t(yawn::midi::MidiMessage::Type::NoteOff),
+                        0, uint8_t(m_bounceLive.note), 0, 0});
+                    m_bounceLive.active = false;
+                }
+            });
+        // unmute the others regardless of outcome (source is muted
+        // below via muteTrack on success only)
+        for (int t = 0; t < 4; ++t)
+            if (t != src && !m_muted[t])
+                m_engine->sendCommand(yawn::audio::SetTrackMuteMsg{t, false});
+        if (!buf || prog.failed.load()) {
+            toast("BOUNCE", "FAILED");
+            std::printf("[bounce] render FAILED\n");
+            return;
+        }
+        // WAV record of the bounce
+        std::error_code ec;
+        std::filesystem::create_directories("samples", ec);
+        char name[64];
+        std::snprintf(name, sizeof(name), "samples/bounce_T%d.wav", src + 1);
+        {
+            const int n = buf->numFrames();
+            std::vector<float> mono;
+            mono.resize(size_t(n));
+            for (int i = 0; i < n; ++i)
+                mono[size_t(i)] = (buf->sample(0, i) + buf->sample(1, i))
+                                  * 0.5f;
+            gb::writeWavMono(name, mono.data(), n, 48000);
+        }
+        // load as a looping clip on the target AUDIO track
+        m_clipBuf[dst] = buf;
+        m_clip[dst].buffer = buf;
+        m_clip[dst].looping = true;
+        m_clipActive[dst] = true;
+        m_engine->sendCommand(yawn::audio::LaunchClipMsg{
+            dst, 0, &m_clip[dst], yawn::audio::QuantizeMode::None});
+        muteTrack(src); // mute the MIDI source
+        m_engine->sendCommand(yawn::audio::TransportPlayMsg{});
+        std::printf("[bounce] T%d -> T%d (%s, %d frames, clip looping)\n",
+                    src + 1, dst + 1, name, int(buf->numFrames()));
+        toast("BOUNCE", name);
+        m_bounceDone = true;
+    }
+
+    // Record: REC-armed + AUDIO track + PLAY captures input into the
+    // track's clip slot. Stop finalizes the take; the clip launches on
+    // the NEXT play — never in the same command window as a transport
+    // stop (the engine's stop triggers a ~5 ms clip fade that would
+    // clobber a clip launched inside it).
+    void recordArmAudioStart() {
+        if (!m_recArmed || m_trackType[m_state.track] != 0) return;
+        m_capture = (m_testMode != 0)
+            ? std::unique_ptr<gb::CaptureSource>(new gb::SineCaptureSource())
+            : std::unique_ptr<gb::CaptureSource>(
+                  new gb::EngineCaptureSource(*m_engine));
+        if (m_capture->start(kTakeFrames)) {
+            m_clipRecording = true;
+            std::printf("[track] T%d clip record start\n",
+                        m_state.track + 1);
+        }
+    }
+
+    void recordArmAudioStop() {
+        if (!m_clipRecording || !m_capture) return;
+        m_capture->stop();
+        const int n = m_capture->framesWritten();
+        const int t = m_state.track;
+        if (n > 0) {
+            m_clipBuf[t] =
+                std::make_shared<yawn::audio::AudioBuffer>(2, n);
+            for (int i = 0; i < n; ++i) {
+                m_clipBuf[t]->sample(0, i) = m_capture->data()[i];
+                m_clipBuf[t]->sample(1, i) = m_capture->data()[i];
+            }
+            m_clip[t].buffer = m_clipBuf[t];
+            m_clip[t].looping = true;
+            m_clipPending[t] = true; // launched on next PLAY
+            std::printf("[track] T%d clip recorded (%d frames, pending "
+                        "launch)\n", t + 1, n);
+            m_clipRecorded = true;
+        }
+        m_capture.reset();
+        m_clipRecording = false;
+    }
+
+    void launchPendingClips() {
+        for (int t = 0; t < 4; ++t) {
+            if (!m_clipPending[t]) continue;
+            m_engine->sendCommand(yawn::audio::LaunchClipMsg{
+                t, 0, &m_clip[t], yawn::audio::QuantizeMode::None});
+            m_clipPending[t] = false;
+            m_clipActive[t] = true;
+            std::printf("[track] T%d clip launched (looping)\n", t + 1);
         }
     }
 
@@ -1751,7 +2101,7 @@ private:
         for (int i = 0; i < n; ++i)
             st[size_t(i) * 2] = st[size_t(i) * 2 + 1] = buf[size_t(i)];
         if (auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
-                m_engine->instrument(1)))
+                m_engine->instrument(m_state.track)))
             rack->loadPad(gb::Pattern::kPadNote[m_state.track], st.data(),
                           n, 2);
         m_assigned = true;
@@ -1833,7 +2183,7 @@ private:
             return;
         }
         if (auto* rack = dynamic_cast<yawn::instruments::DrumRack*>(
-                m_engine->instrument(1)))
+                m_engine->instrument(m_state.track)))
             rack->loadPad(gb::Pattern::kPadNote[m_state.track],
                           data.data(), n, 2);
         std::printf("[load] %s (%d frames @%d) -> T%d pad %d\n",
@@ -1909,6 +2259,10 @@ private:
         j["velSource"] = velSourceName();
         j["ledBrightness"] = m_ledBrightness;
         j["scale"] = scaleName();
+        // per-track channel types (0=AUDIO 1=MIDI)
+        nlohmann::json tt = nlohmann::json::array();
+        for (int t = 0; t < 4; ++t) tt.push_back(m_trackType[t]);
+        j["trackTypes"] = tt;
         // macro assignments, per track (-1 = factory ADSR default)
         nlohmann::json mac;
         for (int t = 0; t < 4; ++t) {
@@ -1956,6 +2310,15 @@ private:
                                 arr[i].get<int>();
                 }
                 rebindParams(); // refresh macro bindings/labels
+            }
+            if (j.contains("trackTypes")) {
+                int t = 0;
+                for (const auto& v : j["trackTypes"]) {
+                    if (t < 4 && v.is_number())
+                        m_trackType[t++] = v.get<int>() == 0 ? 0 : 1;
+                }
+                // NOTE: applied as state only; engine-side type set on
+                // next toggle (settings load happens before engine use).
             }
             std::printf("[set] loaded settings.json (theme=%s vel=%s)\n",
                         th.c_str(), vs.c_str());
@@ -2059,7 +2422,44 @@ private:
                     m_state.fxParams[i].value = -1;
                 }
             }
+        } else if (m_state.page == 7) { // MFX
+            auto& chain = m_engine->midiEffectChain(m_state.track);
+            auto* fx = chain.effect(0);
+            for (int i = 0; i < 4; ++i) {
+                if (fx && i < fx->parameterCount())
+                    std::snprintf(m_encLabelBuf[i], sizeof(m_encLabelBuf[i]),
+                                  "%.8s", fx->parameterInfo(i).name);
+                else
+                    std::snprintf(m_encLabelBuf[i], sizeof(m_encLabelBuf[i]),
+                                  "---");
+                m_state.encLabels[i] = m_encLabelBuf[i];
+            }
+            m_state.mfxName = fx ? fx->name() : nullptr;
+            m_state.mfxBypassed = fx && fx->bypassed();
+            for (int i = 0; i < 4; ++i) {
+                if (fx && i < fx->parameterCount()) {
+                    const auto& pi = fx->parameterInfo(i);
+                    const float range = pi.maxValue - pi.minValue;
+                    m_state.mfxParams[i].name = pi.name;
+                    m_state.mfxParams[i].value =
+                        range > 0.0f
+                            ? int((fx->getParameter(i) - pi.minValue) /
+                                  range * 127.0f + 0.5f)
+                            : 0;
+                } else {
+                    m_state.mfxParams[i].name = nullptr;
+                    m_state.mfxParams[i].value = -1;
+                }
+            }
         }
+        // TRACK page fields (always synced — cheap)
+        m_state.fxSlot = m_fxSlot;
+        m_state.trackType = m_trackType[m_state.track];
+        m_state.trackVol = m_trackVol;
+        m_state.trackPan = m_trackPan;
+        m_state.trackInputCh = m_trackInputCh;
+        m_state.trackMonitor = m_trackMonitor;
+        m_state.trackHasClip = m_clipActive[m_state.track];
     }
 
     int velocity7() {
@@ -2088,7 +2488,9 @@ private:
         else if (m_testMode == 7) sampletestStep(t, once);
         else if (m_testMode == 8) nsr2testStep(t, once);
         else if (m_testMode == 9) revbtestStep(t, once);
-        else                      macrotestStep(t, once);
+        else if (m_testMode == 10) macrotestStep(t, once);
+        else if (m_testMode == 11) tracktestStep(t, once);
+        else                       bouncetestStep(t, once);
     }
 
     // --smoke: boot + notes on both engine tracks + frame per page.
@@ -2371,9 +2773,17 @@ private:
 
     // --panelprobe: injects synthetic SDL mouse events (real backend
     // hit-test + event path) — click white key 1, drag RES pot upward,
-    // wheel over encoder 3 (ATK on the SYNTH page).
+    // wheel over encoder 3 (ATK on the SYNTH page). Desktop-sim only:
+    // the Pi backend has no SDL event queue to inject into.
     template <typename Once>
     void probeStep(double t, Once& once) {
+#ifdef GB_PI_BACKEND
+        if (t >= 0.5 && once(0)) {
+            std::printf("[probe] not supported on the Pi backend "
+                        "(no SDL event injection) — skipped\n");
+            m_running = false;
+        }
+#else
         auto pushButton = [](float x, float y, bool down) {
             SDL_Event e{};
             e.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN
@@ -2442,9 +2852,13 @@ private:
             std::printf("[probe] done — asserting\n");
             m_running = false;
         }
+#endif // GB_PI_BACKEND
     }
 
     int probeVerdict() {
+#ifdef GB_PI_BACKEND
+        return 0; // skipped — see probeStep
+#else
         int pass = 0, fail = 0;
         auto check = [&](bool ok, const char* what) {
             std::printf("[probe] ASSERT %-46s %s\n", what,
@@ -2465,6 +2879,7 @@ private:
             check(m_probeStepOk, "click step-row key -> step toggles on");
         std::printf("[probe] %d/%d assertions PASS\n", pass, pass + fail);
         return fail == 0 ? 0 : 1;
+#endif // GB_PI_BACKEND
     }
 
     // --paramtest: pot pickup, encoder edits/reset/fine, FX chooser,
@@ -2567,9 +2982,7 @@ private:
             onKey(gb::kKeyShiftL, true);
             onKey(gb::kKeyStep0 + 1, true); onKey(gb::kKeyStep0 + 1, false); // shift+step 2 = T2
             onKey(gb::kKeyShiftL, false);
-            onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false); // 0->1
-            onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false); // 1->2
-            onKey(gb::kKeyNext, true); onKey(gb::kKeyNext, false); // 2->3
+            setPage(3); // FX (cycle order changed in M2d)
             softKey(0); // open chooser
             m_ptOk[5] = m_state.chooserOpen;
             softKey(0); // confirm: Reverb (descriptor 0)
@@ -3023,6 +3436,226 @@ private:
         return fail == 0 ? 0 : 1;
     }
 
+    // --tracktest: M2d — per-track engine mapping, instrument swap,
+    // MFX slot, type toggle. (Clip record/bounce = deferred, see
+    // README/report.)
+    template <typename Once>
+    void tracktestStep(double t, Once& once) {
+        if (t >= 0.3 && once(0)) {
+            std::printf("[tracktest] T2 kick + T3 hat steps; PLAY\n");
+            for (int s : {0, 4, 8, 12}) {
+                m_pattern.steps[1][s].on = true;
+                m_pattern.steps[2][s].on = true;
+                m_pattern.steps[1][s].vel = m_pattern.steps[2][s].vel = 110;
+            }
+            togglePlay();
+        }
+        if (t >= 1.0 && once(1)) {
+            std::printf("[tracktest] mute T3 via engine\n");
+            m_t3FiresAtMute = m_fires[2];
+            onKey(gb::kKeyShiftL, true);
+            onKey(gb::kKeyStep0 + 6, true); onKey(gb::kKeyStep0 + 6, false);
+            onKey(gb::kKeyShiftL, false); // shift+step 7 = mute T3
+        }
+        if (t >= 1.6 && once(2)) {
+            // T2 keeps firing, T3 silent at BOTH levels (scheduler skip
+            // + engine mute: T3 meter stays flat while T2's moves)
+            m_ttOk[0] = m_fires[1] > 0 &&
+                        m_fires[2] == m_t3FiresAtMute &&
+                        m_state.mixer.level[1] > 0.001f &&
+                        m_state.mixer.level[2] < m_state.mixer.level[1] * 0.5f;
+            std::printf("[tracktest] isolation: T2 fires=%d meter=%.4f; "
+                        "T3 fires=%d meter=%.5f\n", m_fires[1],
+                        double(m_state.mixer.level[1]), m_fires[2],
+                        double(m_state.mixer.level[2]));
+            stopTransport();
+        }
+        if (t >= 1.8 && once(3)) {
+            std::printf("[tracktest] INST swap T1 subsynth -> fmsynth\n");
+            selectTrack(0);
+            setPage(0);
+            chooserKey(1);                    // open
+            m_state.chooserSel = 1;           // FM Synth
+            chooserKey(1);                    // confirm
+            auto* inst = m_engine->instrument(0);
+            m_ttOk[1] = inst && std::strcmp(inst->id(), "fmsynth") == 0 &&
+                        m_adsrParam[0] >= 0 &&       // "Op1 Attack" bound
+                        m_macroParamByTrack[0][0] == -1; // factory reset
+            std::printf("[tracktest] T1 id=%s, adsr[0]=%d, macro reset=%d\n",
+                        inst ? inst->id() : "?", m_adsrParam[0],
+                        m_macroParamByTrack[0][0]);
+        }
+        if (t >= 2.2 && once(4)) {
+            std::printf("[tracktest] MFX: arpeggiator on T1\n");
+            setPage(7);
+            chooserKey(2);                    // open
+            m_state.chooserSel = 0;           // Arpeggiator
+            chooserKey(2);                    // confirm
+            auto* fx = m_engine->midiEffectChain(0).effect(0);
+            const float before = fx ? fx->getParameter(0) : -1.0f;
+            onEncoderDelta(0, +8); // coarse enough to move a StepSelector
+            const float after = fx ? fx->getParameter(0) : -1.0f;
+            mfxBypassKey();
+            m_ttOk[2] = fx != nullptr && after != before && fx->bypassed();
+            std::printf("[tracktest] MFX param0 %.3f -> %.3f, bypassed=%d\n",
+                        double(before), double(after),
+                        fx ? int(fx->bypassed()) : -1);
+        }
+        if (t >= 2.6 && once(5)) {
+            std::printf("[tracktest] T4 type toggle MIDI->AUDIO->MIDI\n");
+            selectTrack(3);
+            setPage(8);
+            softKey(0); // MIDI -> AUDIO
+            const bool audioOk = m_trackType[3] == 0 &&
+                                 m_engine->instrument(3) == nullptr;
+            softKey(0); // AUDIO -> MIDI
+            auto* inst = m_engine->instrument(3);
+            m_ttOk[3] = audioOk && m_trackType[3] == 1 && inst &&
+                        std::strcmp(inst->id(), "drumrack") == 0;
+            std::printf("[tracktest] T4 type=%d inst=%s\n",
+                        int(m_trackType[3]), inst ? inst->id() : "(none)");
+            std::printf("[tracktest] done — asserting\n");
+            m_running = false;
+        }
+    }
+
+    int tracktestVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[tracktest] ASSERT %-46s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_ttOk[0], "engine-level mute isolation (T3 flat, T2 plays)");
+        check(m_ttOk[1], "INST swap subsynth->fmsynth + rebind + macro reset");
+        check(m_ttOk[2], "MFX arpeggiator add + param edit + bypass");
+        check(m_ttOk[3], "T4 type toggle MIDI<->AUDIO (inst removed/restored)");
+        std::printf("[tracktest] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
+    // --bouncetest: AUDIO-track clip record (test capture source),
+    // bounce T1 pattern -> WAV -> clip on first AUDIO track + mute src,
+    // FX 2-slot independence.
+    template <typename Once>
+    void bouncetestStep(double t, Once& once) {
+        if (t >= 0.3 && once(0)) {
+            std::printf("[bouncetest] T4 -> AUDIO (TRACK page)\n");
+            for (int s : {0, 4, 8, 12}) { // T1 4-floor C4 for the bounce
+                m_pattern.steps[0][s].on = true;
+                m_pattern.steps[0][s].vel = 110;
+            }
+            selectTrack(3);
+            setPage(8);
+            softKey(0); // MIDI -> AUDIO
+            m_btOk[0] = m_trackType[3] == 0 &&
+                        m_engine->instrument(3) == nullptr;
+        }
+        if (t >= 0.5 && once(1)) {
+            std::printf("[bouncetest] REC arm + PLAY (clip record)\n");
+            toggleRec();
+            togglePlay(); // -> recordArmAudioStart
+            m_btOk[1] = m_clipRecording;
+        }
+        if (t >= 1.8 && once(2)) {
+            std::printf("[bouncetest] STOP -> clip finalize\n");
+            stopTransport();
+            // non-silent check
+            float peak = 0.0f;
+            if (m_clipBuf[3])
+                for (int i = 0; i < m_clipBuf[3]->numFrames(); ++i)
+                    peak = std::max(peak,
+                                    std::fabs(m_clipBuf[3]->sample(0, i)));
+            togglePlay(); // clip loops with transport
+            m_btOk[2] = m_clipActive[3] && m_clipRecorded && peak > 0.01f;
+            m_clipPeak = peak;
+            std::printf("[bouncetest] clip peak %.3f\n", double(peak));
+        }
+        if (t >= 2.3 && once(3)) {
+            const auto& cs = m_engine->clipEngine().trackState(3);
+            std::printf("[bouncetest] diag: active=%d stopping=%d "
+                        "playPos=%lld clip=%p\n", int(cs.active),
+                        int(cs.stopping), (long long)cs.playPosition,
+                        (const void*)cs.clip);
+            m_btOk[3] = m_engine->clipEngine().trackState(3).active &&
+                        m_state.mixer.level[3] > 0.0005f;
+            std::printf("[bouncetest] clip active=%d meter=%.4f\n",
+                        int(m_engine->clipEngine().trackState(3).active),
+                        double(m_state.mixer.level[3]));
+        }
+        if (t >= 2.6 && once(4)) {
+            std::printf("[bouncetest] FX 2 slots on T1: reverb + delay\n");
+            stopTransport();
+            selectTrack(0);
+            setPage(3);
+            chooserKey(0);                  // open
+            m_state.chooserSel = 0;         // Reverb
+            chooserKey(0);                  // confirm -> slot 0
+            onKey(gb::kKeyShiftL, true);
+            softKey(1);                     // shift+S2 = slot 2
+            onKey(gb::kKeyShiftL, false);
+            chooserKey(0);
+            m_state.chooserSel = 1;         // Delay
+            chooserKey(0);
+            auto& chain = m_engine->mixer().trackEffects(0);
+            auto* fx0 = chain.effectAt(0);
+            auto* fx1 = chain.effectAt(1);
+            const float rBefore = fx0 ? fx0->getParameter(0) : -1.0f;
+            const float dBefore = fx1 ? fx1->getParameter(0) : -1.0f;
+            onEncoderDelta(0, +2);          // edits slot 1 (Delay)
+            const float rAfter = fx0 ? fx0->getParameter(0) : -1.0f;
+            const float dAfter = fx1 ? fx1->getParameter(0) : -1.0f;
+            fxBypassKey();                  // bypass slot 1 only
+            m_btOk[4] = fx0 && fx1 &&
+                        std::strcmp(fx0->id(), "reverb") == 0 &&
+                        std::strcmp(fx1->id(), "delay") == 0 &&
+                        dAfter != dBefore && rAfter == rBefore &&
+                        fx1->bypassed() && !fx0->bypassed();
+            std::printf("[bouncetest] slot0=%s slot1=%s dParam %.3f->%.3f "
+                        "byp %d/%d\n", fx0 ? fx0->name() : "?",
+                        fx1 ? fx1->name() : "?", double(dBefore),
+                        double(dAfter), fx0 ? int(fx0->bypassed()) : -1,
+                        fx1 ? int(fx1->bypassed()) : -1);
+        }
+        if (t >= 3.4 && once(5)) {
+            std::printf("[bouncetest] bounce T1 -> T4 (TRACK page S3)\n");
+            selectTrack(0);
+            setPage(8);
+            softKey(2); // BOUNCE
+            m_btOk[5] = m_bounceDone && gb::dirExists("samples") &&
+                        m_clipActive[3] && m_muted[0];
+            std::printf("[bouncetest] bounceDone=%d clip=%d muted0=%d\n",
+                        int(m_bounceDone), int(m_clipActive[3]),
+                        int(m_muted[0]));
+        }
+        if (t >= 4.4 && once(6)) {
+            // bounce clip playing on T4: meter moves
+            m_btOk[6] = m_state.mixer.level[3] > 0.0005f;
+            std::printf("[bouncetest] T4 meter after bounce: %.4f\n",
+                        double(m_state.mixer.level[3]));
+            std::printf("[bouncetest] done — asserting\n");
+            m_running = false;
+        }
+    }
+
+    int bouncetestVerdict() const {
+        int pass = 0, fail = 0;
+        auto check = [&](bool ok, const char* what) {
+            std::printf("[bouncetest] ASSERT %-46s %s\n", what,
+                        ok ? "PASS" : "FAIL");
+            ok ? ++pass : ++fail;
+        };
+        check(m_btOk[0], "T4 type MIDI->AUDIO (instrument removed)");
+        check(m_btOk[1], "REC arm + PLAY starts clip capture");
+        check(m_btOk[2], "stop finalizes non-silent clip");
+        check(m_btOk[3], "clip loops with transport (active + meter)");
+        check(m_btOk[4], "FX slots 0/1 independent (edit + bypass)");
+        check(m_btOk[5], "bounce T1->T4: WAV + clip + T1 muted");
+        check(m_btOk[6], "bounced clip plays (T4 meter moves)");
+        std::printf("[bouncetest] %d/%d assertions PASS\n", pass, pass + fail);
+        return fail == 0 ? 0 : 1;
+    }
+
     int seqtestVerdict() const {
         int pass = 0, fail = 0;
         auto check = [&](bool ok, const char* what) {
@@ -3056,7 +3689,66 @@ private:
         }
     }
 
-    gb::SimBackend m_hal;
+    // --profile N: heavy-load profiling harness. Dense 16-step pattern
+    // on all 4 tracks (vel 120), 140 BPM, reverb inserted on T1+T2.
+    // The normal scheduler (updateSequencer) drives the pattern while
+    // the display path (render + presentFrame) stays hot — this mirrors
+    // worst-case panel load on the Pi. Once per second: PortAudio CPU
+    // load % + the PA callback status flags (xrun counters: bit 0x4 =
+    // output underflow, 0x8 = output overflow; see paStreamCallbackFlags).
+    int runProfile(int seconds) {
+        std::printf("[profile] heavy load: 4 tracks x 16 steps (vel 120), "
+                    "140 BPM, reverb on T1+T2, %d s\n", seconds);
+        for (int t = 0; t < 4; ++t)
+            for (int s = 0; s < 16; ++s) {
+                auto& st = m_pattern.steps[t][s];
+                st.on = true; st.vel = 120;
+            }
+        m_pattern.length = 16;
+        for (int t = 0; t < 2; ++t) {
+            auto fx = yawn::createAudioEffect("reverb");
+            std::printf("[profile] reverb %s on T%d\n",
+                        fx ? "inserted" : "FAILED", t + 1);
+            if (fx)
+                m_engine->mixer().trackEffects(gb::Pattern::engineTrack(t))
+                    .insert(0, std::move(fx));
+        }
+        m_state.bpm = 140.0f;
+        m_engine->sendCommand(yawn::audio::TransportSetBPMMsg{140.0});
+        m_engine->sendCommand(yawn::audio::TransportPlayMsg{});
+        const auto t0 = std::chrono::steady_clock::now();
+        int sec = 0;
+        uint32_t xrunFlags = 0; // accumulated under/overflow bits
+        while (m_running && sec < seconds) {
+            m_hal.poll();
+            m_engine->pollRetirements();
+            yawn::audio::AudioEvent ev;
+            while (m_engine->pollEvent(ev)) {}
+            updateSequencer();
+            m_ui.render(m_state, m_fb);
+            m_hal.presentFrame(m_fb);
+            const int el = int(std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - t0).count());
+            if (el > sec) {
+                sec = el;
+                const uint32_t fl = m_engine->consumeCallbackStatusFlags();
+                xrunFlags |= fl & 0x0F; // under/overflow bits only
+                std::printf("[profile] t=%2ds  cpu=%5.1f%%  "
+                            "callback-flags=0x%02x %s\n", sec,
+                            m_engine->cpuLoad() * 100.0, fl,
+                            (fl & 0x0C) ? "(XRUN)" : "");
+                std::fflush(stdout);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        m_engine->sendCommand(yawn::audio::TransportStopMsg{});
+        std::printf("[profile] done: %d s sampled, accumulated xrun bits "
+                    "0x%x (%s)\n", sec, xrunFlags,
+                    xrunFlags ? "under/overflow occurred" : "clean");
+        return 0;
+    }
+
+    HalBackend m_hal;
     gb::Ui m_ui;
     gb::UiState m_state;
     uint16_t m_fb[gb::kDisplayW * gb::kDisplayH] = {};
@@ -3097,6 +3789,28 @@ private:
     int m_potParam[2] = {-1, -1};
     bool m_potEngaged[2] = {};
     float m_potPrev[2] = {};
+
+    // track state (M2d)
+    uint8_t m_trackType[4] = {1, 1, 1, 1}; // 0=AUDIO 1=MIDI
+    std::string m_trackInstId[4] = {"subsynth", "drumrack", "drumrack",
+                                    "drumrack"};
+    float m_trackVol = 1.0f, m_trackPan = 0.0f;
+    int m_trackInputCh = 0;
+    bool m_trackMonitor = false;
+    int m_fxSlot = 0;                     // FX page: insert slot 0/1
+    int m_chooserKind = 0;                // 0=FX 1=INST 2=MFX
+    std::vector<const char*> m_instItems, m_mfxItems;
+    // clips (record + bounce targets)
+    std::shared_ptr<yawn::audio::AudioBuffer> m_clipBuf[4];
+    yawn::audio::Clip m_clip[4];
+    bool m_clipActive[4] = {};
+    bool m_clipRecording = false;
+    bool m_clipPending[4] = {};   // finalized take, launched on next PLAY
+    bool m_clipRecorded = false;
+    bool m_bounceDone = false;
+    int64_t m_bounceLast = -1;
+    struct { bool active; int note; double offBeat; } m_bounceLive =
+        {false, 0, 0.0};
     int m_adsrParam[4] = {-1, -1, -1, -1}; // factory ADSR bindings
     // Macro encoders (5-8): per-track assignment (-1 = factory ADSR)
     int m_macroParamByTrack[4][4] = {};
@@ -3120,6 +3834,7 @@ private:
     bool m_shiftL = false, m_shiftR = false;
     bool m_running = true;
     int m_testMode = 0;
+    int m_profileSecs = 0; // --profile N: heavy-load harness duration
     bool m_testDone[16] = {};
 
     // hold-step edit gesture (SEQ mode)
@@ -3170,6 +3885,10 @@ private:
     bool m_n2Ok[6] = {};  // nsr2test assertions
     bool m_rbOk[6] = {};  // revbtest assertions
     bool m_mcOk[6] = {};  // macrotest assertions
+    bool m_ttOk[4] = {};  // tracktest assertions
+    bool m_btOk[7] = {};  // bouncetest assertions
+    float m_clipPeak = 0.0f;
+    int m_t3FiresAtMute = 0;
     int m_lastGridNote = -1;
 };
 
@@ -3318,6 +4037,7 @@ int main(int argc, char** argv) {
         }
     }
     int testMode = 0;
+    int profileSecs = 0;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--smoke") == 0)      testMode = 1;
         if (std::strcmp(argv[i], "--seqtest") == 0)    testMode = 2;
@@ -3329,8 +4049,13 @@ int main(int argc, char** argv) {
         if (std::strcmp(argv[i], "--nsr2test") == 0)   testMode = 8;
         if (std::strcmp(argv[i], "--revbtest") == 0)   testMode = 9;
         if (std::strcmp(argv[i], "--macrotest") == 0)  testMode = 10;
+        if (std::strcmp(argv[i], "--tracktest") == 0)  testMode = 11;
+        if (std::strcmp(argv[i], "--bouncetest") == 0) testMode = 12;
+        if (std::strcmp(argv[i], "--profile") == 0 && i + 1 < argc)
+            profileSecs = std::atoi(argv[i + 1]);
     }
     App app;
     app.setPanelProfile(panel);
+    app.setProfileSeconds(profileSecs);
     return app.run(testMode);
 }

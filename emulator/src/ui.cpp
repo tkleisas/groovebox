@@ -72,10 +72,11 @@ void Ui::drawParamRow(const UiParam& p, int y0, bool sel, uint16_t* fb) {
 
 void Ui::drawHeader(const UiState& s, uint16_t* fb) {
     fill(fb, 0, 0, kDisplayW, 16, kColWhite);
-    const char* title = s.page == 1 ? "SEQ" : s.page == 2 ? "MIXER"
+    const char* title = s.page == 0 ? "INST"
+                      : s.page == 1 ? "SEQ" : s.page == 2 ? "MIXER"
                       : s.page == 3 ? "FX" : s.page == 4 ? "SAMPLE"
                       : s.page == 5 ? "LOAD" : s.page == 6 ? "SET"
-                      : s.pageName;
+                      : s.page == 7 ? "MFX" : "TRACK";
     text(fb, 4, 1, 2, title, kColBlack);
     if (s.page == 1) {
         // SEQ page: keys mode marker + live transport clock (inverse).
@@ -139,25 +140,66 @@ void Ui::pageSynth(const UiState& s, uint16_t* fb) {
 }
 
 void Ui::pageFx(const UiState& s, uint16_t* fb) {
-    // effect name (or EMPTY) + bypass tag
+    // slot indicator + effect name (or EMPTY) + bypass tag
+    char slotTag[8];
+    std::snprintf(slotTag, sizeof(slotTag), "SLOT %d", s.fxSlot + 1);
+    text(fb, 8, 20, 1, slotTag, kColGray);
     if (s.fxName) {
-        text(fb, 16, 24, 2, s.fxName, kColWhite);
-        if (s.fxBypassed) text(fb, 16, 44, 1, "BYPASSED", kColDim);
+        text(fb, 16, 32, 2, s.fxName, kColWhite);
+        if (s.fxBypassed) text(fb, 16, 48, 1, "BYPASSED", kColDim);
     } else {
-        text(fb, 16, 24, 2, "EMPTY", kColDim);
-        text(fb, 16, 44, 1, "S1 = CHOOSE EFFECT", kColDim);
+        text(fb, 16, 32, 2, "EMPTY", kColDim);
+        text(fb, 16, 48, 1, "S1 = CHOOSE  shift+S2 = SLOT", kColDim);
     }
     for (int i = 0; i < 4; ++i) {
         if (s.fxParams[i].name)
             drawParamRow(s.fxParams[i], 56 + i * 16, false, fb);
     }
-    // effect chooser overlay
+    // chooser overlay
     if (s.chooserOpen && s.chooserItems) {
         Canvas565 c{fb, kDisplayW, kDisplayH};
         ListWidget list{56, 24, 128, 96, s.chooserItems, s.chooserCount,
                         s.chooserSel, s.chooserScroll};
         list.draw(c, m_font);
     }
+}
+
+void Ui::pageMfx(const UiState& s, uint16_t* fb) {
+    if (s.mfxName) {
+        text(fb, 16, 32, 2, s.mfxName, kColWhite);
+        if (s.mfxBypassed) text(fb, 16, 48, 1, "BYPASSED", kColDim);
+    } else {
+        text(fb, 16, 32, 2, "EMPTY", kColDim);
+        text(fb, 16, 48, 1, "S1 = CHOOSE MIDI FX", kColDim);
+    }
+    for (int i = 0; i < 4; ++i) {
+        if (s.mfxParams[i].name)
+            drawParamRow(s.mfxParams[i], 56 + i * 16, false, fb);
+    }
+    if (s.chooserOpen && s.chooserItems) {
+        Canvas565 c{fb, kDisplayW, kDisplayH};
+        ListWidget list{56, 24, 128, 96, s.chooserItems, s.chooserCount,
+                        s.chooserSel, s.chooserScroll};
+        list.draw(c, m_font);
+    }
+}
+
+void Ui::pageTrack(const UiState& s, uint16_t* fb) {
+    // channel strip summary for the selected track
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "T%d", s.track + 1);
+    text(fb, 16, 24, 2, buf, kColWhite);
+    text(fb, 48, 26, 1, s.trackType == 1 ? "MIDI" : "AUDIO",
+         s.trackType == 1 ? kColGray : kColAcc3);
+    if (s.trackHasClip) text(fb, 48, 34, 1, "CLIP", kColDim);
+    UiParam rows[4];
+    std::snprintf(buf, sizeof(buf), "%d", int(s.trackVol * 100 + 0.5f));
+    rows[0] = {"VOL", int(s.trackVol * 127 + 0.5f)};
+    rows[1] = {"PAN", int((s.trackPan + 1.0f) * 63.5f + 0.5f)};
+    rows[2] = {"IN", s.trackInputCh * 127 / 3};
+    rows[3] = {"MON", s.trackMonitor ? 127 : 0};
+    for (int i = 0; i < 4; ++i)
+        drawParamRow(rows[i], 48 + i * 16, false, fb);
 }
 
 void Ui::pageSample(const UiState& s, uint16_t* fb) {
@@ -323,6 +365,8 @@ void Ui::render(const UiState& s, uint16_t* fb) {
     case 4:  pageSample(s, fb); break;
     case 5:  pageLoad(s, fb);  break;
     case 6:  pageSettings(s, fb); break;
+    case 7:  pageMfx(s, fb);   break;
+    case 8:  pageTrack(s, fb); break;
     default: pageSynth(s, fb); break;
     }
     drawLeds(s, fb);

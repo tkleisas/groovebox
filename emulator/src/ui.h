@@ -68,10 +68,23 @@ struct UiState {
     StepLaneWidget lane;   // per-step velocity of the selected track
     MixerWidget mixer;
 
-    // FX page (page 3): one insert effect slot on the selected track.
-    const char* fxName = nullptr;  // nullptr = EMPTY
+    // FX page (page 3): two insert slots on the selected track.
+    const char* fxName = nullptr;  // nullptr = EMPTY (current slot)
     bool fxBypassed = false;
+    int fxSlot = 0;                // insert slot 0/1 (shown as 1/2)
     UiParam fxParams[4] = {};      // first 4 effect params (-1 unbound)
+
+    // MFX page (page 7): one MIDI-effect slot per track.
+    const char* mfxName = nullptr;
+    bool mfxBypassed = false;
+    UiParam mfxParams[4] = {};
+
+    // TRACK page (page 8)
+    int trackType = 1;             // 0=AUDIO 1=MIDI
+    float trackVol = 1.0f, trackPan = 0.0f;
+    int trackInputCh = 0;
+    bool trackMonitor = false;
+    bool trackHasClip = false;
     // effect chooser (ListWidget overlay on the FX page)
     bool chooserOpen = false;
     const char* const* chooserItems = nullptr;
@@ -131,6 +144,8 @@ private:
     void pageSeq(const UiState& s, uint16_t* fb);
     void pageMixer(const UiState& s, uint16_t* fb);
     void pageFx(const UiState& s, uint16_t* fb);
+    void pageMfx(const UiState& s, uint16_t* fb);
+    void pageTrack(const UiState& s, uint16_t* fb);
     void pageSample(const UiState& s, uint16_t* fb);
     void pageLoad(const UiState& s, uint16_t* fb);
     void pageSettings(const UiState& s, uint16_t* fb);

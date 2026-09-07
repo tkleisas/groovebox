@@ -65,7 +65,7 @@ void SimBackend::printLegend() const {
     std::printf(
         "[sim] ── panel view (default; F11 toggles screen-only) ─────────\n"
         "[sim] profiles: --panel=nsr1 (piano panel) / --panel=nsr2 (grid)\n"
-        "[sim] pages: SYNTH SEQ MIXER FX SAMPLE LOAD SET (< > cycle)\n"
+        "[sim] pages: SEQ INST MFX FX MIXER SAMPLE LOAD SET TRACK (< > cycle)\n"
         "[sim] mouse: click/hold keys & buttons = panel key events\n"
         "[sim]        pots = vertical drag or wheel over knob\n"
         "[sim]        slider = horizontal drag; joystick = 2D drag\n"

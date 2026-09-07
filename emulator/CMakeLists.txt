@@ -40,9 +40,21 @@ set(YAWN_HAS_STEM_SEPARATION OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../yawn yawn-build)
 
+# ── Backend selection ───────────────────────────────────────────────
+# OFF (default): SimBackend — SDL3 window + PC keyboard/mouse.
+# ON:  PiBackend — headless Raspberry Pi (fbdev /dev/fb1|fb0 display,
+#      RtMidi USB panel, no SDL3 in the emulator binary). RtMidi +
+#      ALSA come transitively from yawn_core's PUBLIC link.
+option(GB_PI_BACKEND "Headless Raspberry Pi backend (fbdev + RtMidi)" OFF)
+if(GB_PI_BACKEND)
+    set(GB_BACKEND_SRC src/PiBackend.cpp)
+else()
+    set(GB_BACKEND_SRC src/SimBackend.cpp)
+endif()
+
 add_executable(groovebox_sim
     src/main.cpp
-    src/SimBackend.cpp
+    ${GB_BACKEND_SRC}
     src/PanelView.cpp
     src/PanelViewNSR2.cpp
     src/ui.cpp
@@ -65,8 +77,14 @@ target_include_directories(groovebox_sim PRIVATE
 
 target_link_libraries(groovebox_sim PRIVATE
     yawn_core
-    SDL3::SDL3
 )
+# SDL3 is only needed by the SimBackend (window, synthetic probe
+# events). The Pi build links RtMidi/ALSA transitively via yawn_core.
+if(NOT GB_PI_BACKEND)
+    target_link_libraries(groovebox_sim PRIVATE SDL3::SDL3)
+else()
+    target_compile_definitions(groovebox_sim PRIVATE GB_PI_BACKEND)
+endif()
 
 # Emulator sources get their own (milder) warning level — yawn's /W4
 # promote-to-error gate is applied per-target by yawn itself and does

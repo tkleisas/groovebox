@@ -1,5 +1,6 @@
 # Build output (CMake/MSVC) — regenerable
 emulator/build/
+emulator/build-pi-arm64/
 panel-fw/build/
 panel-fw/build.log
 
@@ -35,3 +36,8 @@ nsr2/hardware/HT16K33Av111.pdf
 nsr2/hardware/ht16k33_pins*.png
 nsr2/hardware/ht16k33a_28sop.png
 
+
+# Emulator test artifacts (dumps, takes, local settings)
+*.rgb565
+samples/
+settings.json

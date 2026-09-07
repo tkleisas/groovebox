@@ -45,7 +45,8 @@ struct Pattern {
     static constexpr int kPadNote[kTracks] = {0, 36, 38, 39};
 
     // yawn engine track index for a panel track (0-based).
-    static int engineTrack(int track) { return track == 0 ? 0 : 1; }
+    // M2d: one engine track per UI track (T1-T4 → 0-3).
+    static int engineTrack(int track) { return track; }
 
     // MIDI note a panel track plays live (play mode) / track default.
     int noteForTrack(int track) const {
