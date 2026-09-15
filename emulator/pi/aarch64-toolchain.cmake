@@ -13,6 +13,11 @@ set(CMAKE_SYSTEM_PROCESSOR aarch64)
 set(CMAKE_C_COMPILER   aarch64-linux-gnu-gcc)
 set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 
+# Tune for Cortex-A53 (Pi Zero 2W). NEON/fp is mandatory on AArch64, so
+# float DSP already vectorizes; -mcpu gives A53 instruction scheduling.
+set(CMAKE_C_FLAGS_INIT   "-mcpu=cortex-a53")
+set(CMAKE_CXX_FLAGS_INIT "-mcpu=cortex-a53")
+
 # /usr/aarch64-linux-gnu: cross-compiler sysroot bits.
 # /usr: multiarch target libs/headers (lib/aarch64-linux-gnu,
 #       include/aarch64-linux-gnu) — CMake appends the arch triplet

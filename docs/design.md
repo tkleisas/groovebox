@@ -33,6 +33,12 @@ Consequences:
   Ship criterion: sustained CPU ≤ ~60–65% with no xruns. If it fails, the
   fallback is reducing scope (fewer tracks / lighter FX), not switching
   cores, since battery life is the hard constraint.
+- **Measured on real hardware (v0.0.5, snd-dummy, 256 frames, Release):
+  lean 4×4-step 120 BPM = 36–43% clean; dense 4×8-step 120 BPM + 1 reverb
+  = 55–66% clean; worst-case 16-step 140 BPM + 2 reverbs = ~101% xruns.**
+  Verdict: PASSES for the intended envelope. Practical rule: one reverb at
+  a time on this core; cheap FX are fine. Re-confirm on the real codec at
+  128 frames during bench bring-up (M4).
 
 ## Concept
 

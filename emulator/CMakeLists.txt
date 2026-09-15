@@ -109,3 +109,9 @@ if(TARGET portaudio)
             VERBATIM)
     endif()
 endif()
+
+# Debug: PA_ENABLE_DEBUG_OUTPUT on the Pi build so ALSA enumeration
+# failures are visible on stderr (Zero 2W bring-up diagnostics).
+if(GB_PI_BACKEND AND TARGET portaudio)
+    target_compile_definitions(portaudio PRIVATE PA_ENABLE_DEBUG_OUTPUT)
+endif()

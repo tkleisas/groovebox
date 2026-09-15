@@ -148,6 +148,8 @@ public:
         if (m_nsr2) m_velSource = 1; // NSR-2 default: fixed 100
     }
     void setProfileSeconds(int s) { m_profileSecs = s; }
+    void setProfileLoad(const std::string& l) { m_profileLoad = l; }
+    void setProfileFx(const std::string& f) { m_profileFx = f; }
 
     // testMode: 0 = interactive, 1 = --smoke, 2 = --seqtest
     int run(int testMode) {
@@ -174,6 +176,20 @@ public:
         // ── Boot the yawn engine (mirrors the real app's init) ──────
         m_engine = std::make_unique<yawn::audio::AudioEngine>();
         yawn::audio::AudioEngineConfig cfg; // 48 kHz, 256 frames, defaults
+        // PortAudio's default can be paNoDevice on bare Linux when the
+        // "default" PCM (dmix) fails to open (seen on Pi Zero 2W Lite with
+        // only vc4-hdmi present). Fall back to the first output-capable
+        // device — typically the codec or HDMI audio.
+        if (yawn::audio::AudioEngine::defaultOutputDevice() < 0) {
+            for (const auto& d : yawn::audio::AudioEngine::enumerateDevices()) {
+                if (d.maxOutputChannels > 0) {
+                    cfg.outputDevice = d.id;
+                    std::printf("[engine] PA default missing — using device %d (%s)\n",
+                                d.id, d.name.c_str());
+                    break;
+                }
+            }
+        }
         if (!m_engine->init(cfg)) {
             std::fprintf(stderr, "[engine] init FAILED\n");
             return 1;
@@ -3321,6 +3337,27 @@ private:
                         m_encPages[1].count, m_encPages[2].count,
                         p0, p1, m_paramPage);
         }
+        if (t >= 1.95 && once(13)) {
+            // FX chooser: Plate Reverb loads through the same path
+            // (descriptor-driven list; pick by name, not index).
+            setPage(3);
+            softKey(0); // reopen chooser (slot 0 holds Reverb)
+            int plateSel = -1;
+            for (int i = 0; i < m_state.chooserCount; ++i)
+                if (containsCI(m_state.chooserItems[i], "plate"))
+                    plateSel = i;
+            m_state.chooserSel = plateSel;
+            softKey(0); // confirm
+            const auto* fx = fxOnSelectedTrack();
+            const float b = fx ? fx->getParameter(0) : -1.0f;
+            onEncoderDelta(0, +2); // plate Pre-Delay += 2/16
+            const float a = fx ? fx->getParameter(0) : -1.0f;
+            m_ptOk[12] = plateSel >= 0 && fx &&
+                         std::strcmp(fx->id(), "plate") == 0 && a > b;
+            std::printf("[paramtest] plate: sel=%d fx=%s param0 %.3f -> "
+                        "%.3f\n", plateSel, fx ? fx->name() : "(none)",
+                        double(b), double(a));
+        }
         if (t >= 2.0 && once(8)) {
             std::printf("[paramtest] done — asserting\n");
             m_running = false;
@@ -3346,6 +3383,7 @@ private:
         check(m_ptOk[9], "SubSynth OSC+MOD pages have 4 params each");
         check(m_ptOk[10], "drum: PAD/PAD2/KIT pages, PG+ cycles");
         check(m_ptOk[11], "ADSR macro edit + shift-fine (default bind)");
+        check(m_ptOk[12], "FX chooser loads Plate Reverb + param edit");
         std::printf("[paramtest] %d/%d assertions PASS\n", pass, pass + fail);
         return fail == 0 ? 0 : 1;
     }
@@ -4308,24 +4346,33 @@ private:
     // load % + the PA callback status flags (xrun counters: bit 0x4 =
     // output underflow, 0x8 = output overflow; see paStreamCallbackFlags).
     int runProfile(int seconds) {
-        std::printf("[profile] heavy load: 4 tracks x 16 steps (vel 120), "
-                    "140 BPM, reverb on T1+T2, %d s\n", seconds);
+        // Load profiles: heavy = worst-case stress; real = dense but typical
+        // musical load; lean = minimal groovebox load.
+        const bool real = m_profileLoad == "real";
+        const bool lean = m_profileLoad == "lean";
+        const int stepsPerTrack = lean ? 4 : real ? 8 : 16;
+        const double bpm = lean ? 120.0 : real ? 120.0 : 140.0;
+        const int reverbTracks = lean ? 0 : real ? 1 : 2;
+        std::printf("[profile] load=%s: 4 tracks x %d steps (vel 120), "
+                    "%.0f BPM, %s x%d, %d s\n",
+                    m_profileLoad.c_str(), stepsPerTrack, bpm,
+                    m_profileFx.c_str(), reverbTracks, seconds);
         for (int t = 0; t < 4; ++t)
-            for (int s = 0; s < 16; ++s) {
+            for (int s = 0; s < stepsPerTrack; ++s) {
                 auto& st = m_pattern.steps[t][s];
                 st.on = true; st.vel = 120;
             }
         m_pattern.length = 16;
-        for (int t = 0; t < 2; ++t) {
-            auto fx = yawn::createAudioEffect("reverb");
-            std::printf("[profile] reverb %s on T%d\n",
+        for (int t = 0; t < reverbTracks; ++t) {
+            auto fx = yawn::createAudioEffect(m_profileFx);
+            std::printf("[profile] %s %s on T%d\n", m_profileFx.c_str(),
                         fx ? "inserted" : "FAILED", t + 1);
             if (fx)
                 m_engine->mixer().trackEffects(gb::Pattern::engineTrack(t))
                     .insert(0, std::move(fx));
         }
-        m_state.bpm = 140.0f;
-        m_engine->sendCommand(yawn::audio::TransportSetBPMMsg{140.0});
+        m_state.bpm = float(bpm);
+        m_engine->sendCommand(yawn::audio::TransportSetBPMMsg{bpm});
         m_engine->sendCommand(yawn::audio::TransportPlayMsg{});
         const auto t0 = std::chrono::steady_clock::now();
         int sec = 0;
@@ -4446,6 +4493,8 @@ private:
     bool m_running = true;
     int m_testMode = 0;
     int m_profileSecs = 0; // --profile N: heavy-load harness duration
+    std::string m_profileLoad = "heavy"; // --load heavy|real|lean
+    std::string m_profileFx = "reverb";  // --fx <id> (profile inserts)
     bool m_testDone[16] = {};
 
     // hold-step edit gesture (SEQ mode)
@@ -4491,7 +4540,7 @@ private:
     bool m_repeatOk = false;
     int m_probeNotes = 0;
     bool m_probeStepOk = false;
-    bool m_ptOk[12] = {}; // paramtest assertions
+    bool m_ptOk[13] = {}; // paramtest assertions
     bool m_stOk[8] = {};  // sampletest assertions
     bool m_n2Ok[6] = {};  // nsr2test assertions
     bool m_rbOk[6] = {};  // revbtest assertions
@@ -4634,6 +4683,17 @@ int main(int argc, char** argv) {
             std::printf("groovebox_sim %s\n", GB_VERSION_STRING);
             return 0;
         }
+        if (std::strcmp(argv[i], "--devices") == 0) {
+            std::printf("default out=%d in=%d\n",
+                        yawn::audio::AudioEngine::defaultOutputDevice(),
+                        yawn::audio::AudioEngine::defaultInputDevice());
+            for (const auto& d : yawn::audio::AudioEngine::enumerateDevices())
+                std::printf("  [%d] %s (%s) in=%d out=%d %.0fHz\n", d.id,
+                            d.name.c_str(), d.hostApi.c_str(),
+                            d.maxInputChannels, d.maxOutputChannels,
+                            d.defaultSampleRate);
+            return 0;
+        }
         if (std::strcmp(argv[i], "--fontchart") == 0) {
             const char* out = (i + 1 < argc && argv[i + 1][0] != '-')
                                   ? argv[i + 1] : "fontchart.png";
@@ -4662,6 +4722,8 @@ int main(int argc, char** argv) {
     }
     int testMode = 0;
     int profileSecs = 0;
+    std::string profileLoad = "heavy";
+    std::string profileFx = "reverb";
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--smoke") == 0)      testMode = 1;
         if (std::strcmp(argv[i], "--seqtest") == 0)    testMode = 2;
@@ -4679,9 +4741,15 @@ int main(int argc, char** argv) {
         if (std::strcmp(argv[i], "--padtest") == 0)    testMode = 14;
         if (std::strcmp(argv[i], "--profile") == 0 && i + 1 < argc)
             profileSecs = std::atoi(argv[i + 1]);
+        if (std::strcmp(argv[i], "--load") == 0 && i + 1 < argc)
+            profileLoad = argv[i + 1];
+        if (std::strcmp(argv[i], "--fx") == 0 && i + 1 < argc)
+            profileFx = argv[i + 1];
     }
     App app;
     app.setPanelProfile(panel);
     app.setProfileSeconds(profileSecs);
+    app.setProfileLoad(profileLoad);
+    app.setProfileFx(profileFx);
     return app.run(testMode);
 }

@@ -41,3 +41,4 @@ nsr2/hardware/ht16k33a_28sop.png
 *.rgb565
 samples/
 settings.json
+tools/pi_credentials.txt
