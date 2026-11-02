@@ -1,5 +1,5 @@
 // groovebox-panel firmware entry point (rev B2).
-// Superloop + 1 ms tick: USB MIDI via TinyUSB, 4x MCP23017 key scan (55 keys
+// Superloop + 1 ms tick: USB MIDI via TinyUSB, 5x MCP23017 key scan (55 keys
 // + 8 encoder pushes), 2x ADS1115 analog polling, 8 quadrature encoders,
 // HT16K33 LED output (32 LEDs), GRV config service. Watchdog (4 s) kicked
 // every loop iteration.

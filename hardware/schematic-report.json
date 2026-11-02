@@ -1,0 +1,18 @@
+[
+  {
+    "board": "control",
+    "symbols": 53,
+    "nets": 53,
+    "unconnected": 0,
+    "errors": [],
+    "key_nets": 11
+  },
+  {
+    "board": "keyboard",
+    "symbols": 120,
+    "nets": 93,
+    "unconnected": 0,
+    "errors": [],
+    "key_nets": 45
+  }
+]

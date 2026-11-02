@@ -88,8 +88,8 @@ static void scan_chip(unsigned c) {
 }
 
 void keys_tick(void) {
-    // All four expanders every 1 ms tick: 4 x ~125 us of I2C at 400 kHz
-    // (~0.5 ms total) — half the tick budget, tud_task still serviced
+    // All five expanders every 1 ms tick: 5 x ~125 us of I2C at 400 kHz
+    // (~0.6 ms total) — half the tick budget, tud_task still serviced
     // between ticks. Offline chips are skipped before any bus traffic.
     for (unsigned c = 0; c < KEY_CHIP_COUNT; c++) scan_chip(c);
 }

@@ -35,7 +35,7 @@
 	)
 	(gr_line
 		(start 356 0)
-		(end 356 62)
+		(end 356 100)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -44,8 +44,8 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-00000000006e")
 	)
 	(gr_line
-		(start 356 62)
-		(end 0 62)
+		(start 356 100)
+		(end 0 100)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -54,7 +54,7 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-00000000006f")
 	)
 	(gr_line
-		(start 0 62)
+		(start 0 100)
 		(end 0 0)
 		(stroke
 			(width 0.05)
@@ -86,8 +86,8 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000072")
 	)
 	(gr_circle
-		(center 5 57)
-		(end 6.6 57)
+		(center 5 95)
+		(end 6.6 95)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -97,8 +97,8 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000073")
 	)
 	(gr_circle
-		(center 351 57)
-		(end 352.6 57)
+		(center 351 95)
+		(end 352.6 95)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -107,17 +107,15 @@
 		(layer "Edge.Cuts")
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000074")
 	)
-	(gr_text
-		(at 178.0 68.0)
+	(gr_text "keyboard board rev B2 - 356x100mm - 45 MX sockets + 32 LEDs - M3 at corners"
+		(at 178.0 106.0)
 		(layer "Cmts.User")
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000075")
-		(hide no)
 		(effects
 			(font
 				(size 2 2)
 				(thickness 0.3)
 			)
 		)
-		"keyboard board rev A - 356x62mm - 29 MX sockets + 16 LEDs - M3 at corners"
 	)
 )

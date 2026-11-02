@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "nsr2")(type "KiCad")(uri "${KIPRJMOD}/../../nsr2/hardware/nsr2.kicad_sym")(options "")(descr "NSR-2 custom symbols"))
+)

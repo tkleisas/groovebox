@@ -1,0 +1,1103 @@
+<?xml version='1.0' encoding='utf-8'?>
+<export version="E">
+  <design>
+    <source>keyboard.kicad_sch</source>
+    <date>2026-11-02</date>
+    <tool>EMD NSR-1 generator</tool>
+  </design>
+  <components>
+    <comp ref="C1">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C2">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C3">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C4">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="D1">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D10">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D11">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D12">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D13">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D14">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D15">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D16">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D17">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D18">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D19">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D2">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D20">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D21">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D22">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D23">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D24">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D25">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D26">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D27">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D28">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D29">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D3">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D30">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D31">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D32">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D4">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D5">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D6">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D7">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D8">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D9">
+      <value>red</value>
+      <footprint>LED_THT:LED_D3.0mm</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="J1">
+      <value>I2C_LINK</value>
+      <footprint>Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical</footprint>
+      <libsource lib="Connector_Generic" part="Conn_01x04" />
+    </comp>
+    <comp ref="R1">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R10">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R11">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R12">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R13">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R14">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R15">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R16">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R17">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R18">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R19">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R2">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R20">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R21">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R22">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R23">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R24">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R25">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R26">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R27">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R28">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R29">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R3">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R30">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R31">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R32">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R4">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R5">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R6">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R7">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R8">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R9">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="SW1">
+      <value>KEY0</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW10">
+      <value>KEY9</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW11">
+      <value>KEY10</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW12">
+      <value>KEY11</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW13">
+      <value>KEY12</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW14">
+      <value>KEY13</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW15">
+      <value>KEY14</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW16">
+      <value>KEY15</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW17">
+      <value>KEY16</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW18">
+      <value>KEY17</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW19">
+      <value>KEY18</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW2">
+      <value>KEY1</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW20">
+      <value>KEY19</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW21">
+      <value>KEY20</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW22">
+      <value>KEY21</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW23">
+      <value>KEY22</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW24">
+      <value>KEY23</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW25">
+      <value>KEY24</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW26">
+      <value>KEY25</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW27">
+      <value>KEY26</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW28">
+      <value>KEY38</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW29">
+      <value>KEY39</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW3">
+      <value>KEY2</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW30">
+      <value>KEY40</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW31">
+      <value>KEY41</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW32">
+      <value>KEY42</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW33">
+      <value>KEY43</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW34">
+      <value>KEY44</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW35">
+      <value>KEY45</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW36">
+      <value>KEY46</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW37">
+      <value>KEY47</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW38">
+      <value>KEY48</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW39">
+      <value>KEY49</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW4">
+      <value>KEY3</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW40">
+      <value>KEY50</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW41">
+      <value>KEY51</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW42">
+      <value>KEY52</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW43">
+      <value>KEY53</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW44">
+      <value>KEY54</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW45">
+      <value>KEY55</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW5">
+      <value>KEY4</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW6">
+      <value>KEY5</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW7">
+      <value>KEY6</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW8">
+      <value>KEY7</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="SW9">
+      <value>KEY8</value>
+      <footprint>nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u</footprint>
+      <libsource lib="Switch" part="SW_Push" />
+    </comp>
+    <comp ref="U1">
+      <value>MCP23017</value>
+      <footprint>Package_SO:SSOP-28_5.3x10.2mm_P0.65mm</footprint>
+      <libsource lib="Interface_Expansion" part="MCP23017x-x-SO" />
+    </comp>
+    <comp ref="U2">
+      <value>MCP23017</value>
+      <footprint>Package_SO:SSOP-28_5.3x10.2mm_P0.65mm</footprint>
+      <libsource lib="Interface_Expansion" part="MCP23017x-x-SO" />
+    </comp>
+    <comp ref="U3">
+      <value>MCP23017</value>
+      <footprint>Package_SO:SSOP-28_5.3x10.2mm_P0.65mm</footprint>
+      <libsource lib="Interface_Expansion" part="MCP23017x-x-SO" />
+    </comp>
+    <comp ref="U4">
+      <value>HT16K33A</value>
+      <footprint>Package_SO:SSOP-28_5.3x10.2mm_P0.65mm</footprint>
+      <libsource lib="nsr2" part="HT16K33A" />
+    </comp>
+  </components>
+  <nets>
+    <net code="1" name="+3V3">
+      <node ref="C1" pin="1" pinfunction="" />
+      <node ref="C2" pin="1" pinfunction="" />
+      <node ref="C3" pin="1" pinfunction="" />
+      <node ref="C4" pin="1" pinfunction="" />
+      <node ref="J1" pin="1" pinfunction="Pin_1" />
+      <node ref="U1" pin="18" pinfunction="~{RESET}" />
+      <node ref="U1" pin="9" pinfunction="V_{DD}" />
+      <node ref="U2" pin="15" pinfunction="A0" />
+      <node ref="U2" pin="18" pinfunction="~{RESET}" />
+      <node ref="U2" pin="9" pinfunction="V_{DD}" />
+      <node ref="U3" pin="15" pinfunction="A0" />
+      <node ref="U3" pin="16" pinfunction="A1" />
+      <node ref="U3" pin="18" pinfunction="~{RESET}" />
+      <node ref="U3" pin="9" pinfunction="V_{DD}" />
+      <node ref="U4" pin="28" pinfunction="VDD" />
+    </net>
+    <net code="2" name="COM0">
+      <node ref="D1" pin="2" pinfunction="A" />
+      <node ref="D2" pin="2" pinfunction="A" />
+      <node ref="D3" pin="2" pinfunction="A" />
+      <node ref="D4" pin="2" pinfunction="A" />
+      <node ref="D5" pin="2" pinfunction="A" />
+      <node ref="D6" pin="2" pinfunction="A" />
+      <node ref="D7" pin="2" pinfunction="A" />
+      <node ref="D8" pin="2" pinfunction="A" />
+      <node ref="U4" pin="2" pinfunction="COM0" />
+    </net>
+    <net code="3" name="COM1">
+      <node ref="D10" pin="2" pinfunction="A" />
+      <node ref="D11" pin="2" pinfunction="A" />
+      <node ref="D12" pin="2" pinfunction="A" />
+      <node ref="D13" pin="2" pinfunction="A" />
+      <node ref="D14" pin="2" pinfunction="A" />
+      <node ref="D15" pin="2" pinfunction="A" />
+      <node ref="D16" pin="2" pinfunction="A" />
+      <node ref="D9" pin="2" pinfunction="A" />
+      <node ref="U4" pin="3" pinfunction="COM1" />
+    </net>
+    <net code="4" name="COM2">
+      <node ref="D17" pin="2" pinfunction="A" />
+      <node ref="D18" pin="2" pinfunction="A" />
+      <node ref="D19" pin="2" pinfunction="A" />
+      <node ref="D20" pin="2" pinfunction="A" />
+      <node ref="D21" pin="2" pinfunction="A" />
+      <node ref="D22" pin="2" pinfunction="A" />
+      <node ref="D23" pin="2" pinfunction="A" />
+      <node ref="D24" pin="2" pinfunction="A" />
+      <node ref="U4" pin="4" pinfunction="COM2" />
+    </net>
+    <net code="5" name="COM3">
+      <node ref="D25" pin="2" pinfunction="A" />
+      <node ref="D26" pin="2" pinfunction="A" />
+      <node ref="D27" pin="2" pinfunction="A" />
+      <node ref="D28" pin="2" pinfunction="A" />
+      <node ref="D29" pin="2" pinfunction="A" />
+      <node ref="D30" pin="2" pinfunction="A" />
+      <node ref="D31" pin="2" pinfunction="A" />
+      <node ref="D32" pin="2" pinfunction="A" />
+      <node ref="U4" pin="5" pinfunction="COM3" />
+    </net>
+    <net code="6" name="GND">
+      <node ref="C1" pin="2" pinfunction="" />
+      <node ref="C2" pin="2" pinfunction="" />
+      <node ref="C3" pin="2" pinfunction="" />
+      <node ref="C4" pin="2" pinfunction="" />
+      <node ref="J1" pin="2" pinfunction="Pin_2" />
+      <node ref="SW1" pin="2" pinfunction="2" />
+      <node ref="SW10" pin="2" pinfunction="2" />
+      <node ref="SW11" pin="2" pinfunction="2" />
+      <node ref="SW12" pin="2" pinfunction="2" />
+      <node ref="SW13" pin="2" pinfunction="2" />
+      <node ref="SW14" pin="2" pinfunction="2" />
+      <node ref="SW15" pin="2" pinfunction="2" />
+      <node ref="SW16" pin="2" pinfunction="2" />
+      <node ref="SW17" pin="2" pinfunction="2" />
+      <node ref="SW18" pin="2" pinfunction="2" />
+      <node ref="SW19" pin="2" pinfunction="2" />
+      <node ref="SW2" pin="2" pinfunction="2" />
+      <node ref="SW20" pin="2" pinfunction="2" />
+      <node ref="SW21" pin="2" pinfunction="2" />
+      <node ref="SW22" pin="2" pinfunction="2" />
+      <node ref="SW23" pin="2" pinfunction="2" />
+      <node ref="SW24" pin="2" pinfunction="2" />
+      <node ref="SW25" pin="2" pinfunction="2" />
+      <node ref="SW26" pin="2" pinfunction="2" />
+      <node ref="SW27" pin="2" pinfunction="2" />
+      <node ref="SW28" pin="2" pinfunction="2" />
+      <node ref="SW29" pin="2" pinfunction="2" />
+      <node ref="SW3" pin="2" pinfunction="2" />
+      <node ref="SW30" pin="2" pinfunction="2" />
+      <node ref="SW31" pin="2" pinfunction="2" />
+      <node ref="SW32" pin="2" pinfunction="2" />
+      <node ref="SW33" pin="2" pinfunction="2" />
+      <node ref="SW34" pin="2" pinfunction="2" />
+      <node ref="SW35" pin="2" pinfunction="2" />
+      <node ref="SW36" pin="2" pinfunction="2" />
+      <node ref="SW37" pin="2" pinfunction="2" />
+      <node ref="SW38" pin="2" pinfunction="2" />
+      <node ref="SW39" pin="2" pinfunction="2" />
+      <node ref="SW4" pin="2" pinfunction="2" />
+      <node ref="SW40" pin="2" pinfunction="2" />
+      <node ref="SW41" pin="2" pinfunction="2" />
+      <node ref="SW42" pin="2" pinfunction="2" />
+      <node ref="SW43" pin="2" pinfunction="2" />
+      <node ref="SW44" pin="2" pinfunction="2" />
+      <node ref="SW45" pin="2" pinfunction="2" />
+      <node ref="SW5" pin="2" pinfunction="2" />
+      <node ref="SW6" pin="2" pinfunction="2" />
+      <node ref="SW7" pin="2" pinfunction="2" />
+      <node ref="SW8" pin="2" pinfunction="2" />
+      <node ref="SW9" pin="2" pinfunction="2" />
+      <node ref="U1" pin="10" pinfunction="V_{SS}" />
+      <node ref="U1" pin="15" pinfunction="A0" />
+      <node ref="U1" pin="16" pinfunction="A1" />
+      <node ref="U1" pin="17" pinfunction="A2" />
+      <node ref="U2" pin="10" pinfunction="V_{SS}" />
+      <node ref="U2" pin="16" pinfunction="A1" />
+      <node ref="U2" pin="17" pinfunction="A2" />
+      <node ref="U3" pin="10" pinfunction="V_{SS}" />
+      <node ref="U3" pin="17" pinfunction="A2" />
+      <node ref="U4" pin="1" pinfunction="VSS" />
+    </net>
+    <net code="7" name="KEY0">
+      <node ref="SW1" pin="1" pinfunction="1" />
+      <node ref="U1" pin="21" pinfunction="GPA0" />
+    </net>
+    <net code="8" name="KEY1">
+      <node ref="SW2" pin="1" pinfunction="1" />
+      <node ref="U1" pin="22" pinfunction="GPA1" />
+    </net>
+    <net code="9" name="KEY10">
+      <node ref="SW11" pin="1" pinfunction="1" />
+      <node ref="U1" pin="3" pinfunction="GPB2" />
+    </net>
+    <net code="10" name="KEY11">
+      <node ref="SW12" pin="1" pinfunction="1" />
+      <node ref="U1" pin="4" pinfunction="GPB3" />
+    </net>
+    <net code="11" name="KEY12">
+      <node ref="SW13" pin="1" pinfunction="1" />
+      <node ref="U1" pin="5" pinfunction="GPB4" />
+    </net>
+    <net code="12" name="KEY13">
+      <node ref="SW14" pin="1" pinfunction="1" />
+      <node ref="U1" pin="6" pinfunction="GPB5" />
+    </net>
+    <net code="13" name="KEY14">
+      <node ref="SW15" pin="1" pinfunction="1" />
+      <node ref="U1" pin="7" pinfunction="GPB6" />
+    </net>
+    <net code="14" name="KEY15">
+      <node ref="SW16" pin="1" pinfunction="1" />
+      <node ref="U1" pin="8" pinfunction="GPB7" />
+    </net>
+    <net code="15" name="KEY16">
+      <node ref="SW17" pin="1" pinfunction="1" />
+      <node ref="U2" pin="21" pinfunction="GPA0" />
+    </net>
+    <net code="16" name="KEY17">
+      <node ref="SW18" pin="1" pinfunction="1" />
+      <node ref="U2" pin="22" pinfunction="GPA1" />
+    </net>
+    <net code="17" name="KEY18">
+      <node ref="SW19" pin="1" pinfunction="1" />
+      <node ref="U2" pin="23" pinfunction="GPA2" />
+    </net>
+    <net code="18" name="KEY19">
+      <node ref="SW20" pin="1" pinfunction="1" />
+      <node ref="U2" pin="24" pinfunction="GPA3" />
+    </net>
+    <net code="19" name="KEY2">
+      <node ref="SW3" pin="1" pinfunction="1" />
+      <node ref="U1" pin="23" pinfunction="GPA2" />
+    </net>
+    <net code="20" name="KEY20">
+      <node ref="SW21" pin="1" pinfunction="1" />
+      <node ref="U2" pin="25" pinfunction="GPA4" />
+    </net>
+    <net code="21" name="KEY21">
+      <node ref="SW22" pin="1" pinfunction="1" />
+      <node ref="U2" pin="26" pinfunction="GPA5" />
+    </net>
+    <net code="22" name="KEY22">
+      <node ref="SW23" pin="1" pinfunction="1" />
+      <node ref="U2" pin="27" pinfunction="GPA6" />
+    </net>
+    <net code="23" name="KEY23">
+      <node ref="SW24" pin="1" pinfunction="1" />
+      <node ref="U2" pin="28" pinfunction="GPA7" />
+    </net>
+    <net code="24" name="KEY24">
+      <node ref="SW25" pin="1" pinfunction="1" />
+      <node ref="U2" pin="1" pinfunction="GPB0" />
+    </net>
+    <net code="25" name="KEY25">
+      <node ref="SW26" pin="1" pinfunction="1" />
+      <node ref="U2" pin="2" pinfunction="GPB1" />
+    </net>
+    <net code="26" name="KEY26">
+      <node ref="SW27" pin="1" pinfunction="1" />
+      <node ref="U2" pin="3" pinfunction="GPB2" />
+    </net>
+    <net code="27" name="KEY3">
+      <node ref="SW4" pin="1" pinfunction="1" />
+      <node ref="U1" pin="24" pinfunction="GPA3" />
+    </net>
+    <net code="28" name="KEY38">
+      <node ref="SW28" pin="1" pinfunction="1" />
+      <node ref="U2" pin="4" pinfunction="GPB3" />
+    </net>
+    <net code="29" name="KEY39">
+      <node ref="SW29" pin="1" pinfunction="1" />
+      <node ref="U2" pin="5" pinfunction="GPB4" />
+    </net>
+    <net code="30" name="KEY4">
+      <node ref="SW5" pin="1" pinfunction="1" />
+      <node ref="U1" pin="25" pinfunction="GPA4" />
+    </net>
+    <net code="31" name="KEY40">
+      <node ref="SW30" pin="1" pinfunction="1" />
+      <node ref="U3" pin="21" pinfunction="GPA0" />
+    </net>
+    <net code="32" name="KEY41">
+      <node ref="SW31" pin="1" pinfunction="1" />
+      <node ref="U3" pin="22" pinfunction="GPA1" />
+    </net>
+    <net code="33" name="KEY42">
+      <node ref="SW32" pin="1" pinfunction="1" />
+      <node ref="U3" pin="23" pinfunction="GPA2" />
+    </net>
+    <net code="34" name="KEY43">
+      <node ref="SW33" pin="1" pinfunction="1" />
+      <node ref="U3" pin="24" pinfunction="GPA3" />
+    </net>
+    <net code="35" name="KEY44">
+      <node ref="SW34" pin="1" pinfunction="1" />
+      <node ref="U3" pin="25" pinfunction="GPA4" />
+    </net>
+    <net code="36" name="KEY45">
+      <node ref="SW35" pin="1" pinfunction="1" />
+      <node ref="U3" pin="26" pinfunction="GPA5" />
+    </net>
+    <net code="37" name="KEY46">
+      <node ref="SW36" pin="1" pinfunction="1" />
+      <node ref="U3" pin="27" pinfunction="GPA6" />
+    </net>
+    <net code="38" name="KEY47">
+      <node ref="SW37" pin="1" pinfunction="1" />
+      <node ref="U3" pin="28" pinfunction="GPA7" />
+    </net>
+    <net code="39" name="KEY48">
+      <node ref="SW38" pin="1" pinfunction="1" />
+      <node ref="U3" pin="1" pinfunction="GPB0" />
+    </net>
+    <net code="40" name="KEY49">
+      <node ref="SW39" pin="1" pinfunction="1" />
+      <node ref="U3" pin="2" pinfunction="GPB1" />
+    </net>
+    <net code="41" name="KEY5">
+      <node ref="SW6" pin="1" pinfunction="1" />
+      <node ref="U1" pin="26" pinfunction="GPA5" />
+    </net>
+    <net code="42" name="KEY50">
+      <node ref="SW40" pin="1" pinfunction="1" />
+      <node ref="U3" pin="3" pinfunction="GPB2" />
+    </net>
+    <net code="43" name="KEY51">
+      <node ref="SW41" pin="1" pinfunction="1" />
+      <node ref="U3" pin="4" pinfunction="GPB3" />
+    </net>
+    <net code="44" name="KEY52">
+      <node ref="SW42" pin="1" pinfunction="1" />
+      <node ref="U3" pin="5" pinfunction="GPB4" />
+    </net>
+    <net code="45" name="KEY53">
+      <node ref="SW43" pin="1" pinfunction="1" />
+      <node ref="U3" pin="6" pinfunction="GPB5" />
+    </net>
+    <net code="46" name="KEY54">
+      <node ref="SW44" pin="1" pinfunction="1" />
+      <node ref="U3" pin="7" pinfunction="GPB6" />
+    </net>
+    <net code="47" name="KEY55">
+      <node ref="SW45" pin="1" pinfunction="1" />
+      <node ref="U3" pin="8" pinfunction="GPB7" />
+    </net>
+    <net code="48" name="KEY6">
+      <node ref="SW7" pin="1" pinfunction="1" />
+      <node ref="U1" pin="27" pinfunction="GPA6" />
+    </net>
+    <net code="49" name="KEY7">
+      <node ref="SW8" pin="1" pinfunction="1" />
+      <node ref="U1" pin="28" pinfunction="GPA7" />
+    </net>
+    <net code="50" name="KEY8">
+      <node ref="SW9" pin="1" pinfunction="1" />
+      <node ref="U1" pin="1" pinfunction="GPB0" />
+    </net>
+    <net code="51" name="KEY9">
+      <node ref="SW10" pin="1" pinfunction="1" />
+      <node ref="U1" pin="2" pinfunction="GPB1" />
+    </net>
+    <net code="52" name="LED0">
+      <node ref="D1" pin="1" pinfunction="K" />
+      <node ref="R1" pin="1" pinfunction="" />
+    </net>
+    <net code="53" name="LED1">
+      <node ref="D2" pin="1" pinfunction="K" />
+      <node ref="R2" pin="1" pinfunction="" />
+    </net>
+    <net code="54" name="LED10">
+      <node ref="D11" pin="1" pinfunction="K" />
+      <node ref="R11" pin="1" pinfunction="" />
+    </net>
+    <net code="55" name="LED11">
+      <node ref="D12" pin="1" pinfunction="K" />
+      <node ref="R12" pin="1" pinfunction="" />
+    </net>
+    <net code="56" name="LED12">
+      <node ref="D13" pin="1" pinfunction="K" />
+      <node ref="R13" pin="1" pinfunction="" />
+    </net>
+    <net code="57" name="LED13">
+      <node ref="D14" pin="1" pinfunction="K" />
+      <node ref="R14" pin="1" pinfunction="" />
+    </net>
+    <net code="58" name="LED14">
+      <node ref="D15" pin="1" pinfunction="K" />
+      <node ref="R15" pin="1" pinfunction="" />
+    </net>
+    <net code="59" name="LED15">
+      <node ref="D16" pin="1" pinfunction="K" />
+      <node ref="R16" pin="1" pinfunction="" />
+    </net>
+    <net code="60" name="LED16">
+      <node ref="D17" pin="1" pinfunction="K" />
+      <node ref="R17" pin="1" pinfunction="" />
+    </net>
+    <net code="61" name="LED17">
+      <node ref="D18" pin="1" pinfunction="K" />
+      <node ref="R18" pin="1" pinfunction="" />
+    </net>
+    <net code="62" name="LED18">
+      <node ref="D19" pin="1" pinfunction="K" />
+      <node ref="R19" pin="1" pinfunction="" />
+    </net>
+    <net code="63" name="LED19">
+      <node ref="D20" pin="1" pinfunction="K" />
+      <node ref="R20" pin="1" pinfunction="" />
+    </net>
+    <net code="64" name="LED2">
+      <node ref="D3" pin="1" pinfunction="K" />
+      <node ref="R3" pin="1" pinfunction="" />
+    </net>
+    <net code="65" name="LED20">
+      <node ref="D21" pin="1" pinfunction="K" />
+      <node ref="R21" pin="1" pinfunction="" />
+    </net>
+    <net code="66" name="LED21">
+      <node ref="D22" pin="1" pinfunction="K" />
+      <node ref="R22" pin="1" pinfunction="" />
+    </net>
+    <net code="67" name="LED22">
+      <node ref="D23" pin="1" pinfunction="K" />
+      <node ref="R23" pin="1" pinfunction="" />
+    </net>
+    <net code="68" name="LED23">
+      <node ref="D24" pin="1" pinfunction="K" />
+      <node ref="R24" pin="1" pinfunction="" />
+    </net>
+    <net code="69" name="LED24">
+      <node ref="D25" pin="1" pinfunction="K" />
+      <node ref="R25" pin="1" pinfunction="" />
+    </net>
+    <net code="70" name="LED25">
+      <node ref="D26" pin="1" pinfunction="K" />
+      <node ref="R26" pin="1" pinfunction="" />
+    </net>
+    <net code="71" name="LED26">
+      <node ref="D27" pin="1" pinfunction="K" />
+      <node ref="R27" pin="1" pinfunction="" />
+    </net>
+    <net code="72" name="LED27">
+      <node ref="D28" pin="1" pinfunction="K" />
+      <node ref="R28" pin="1" pinfunction="" />
+    </net>
+    <net code="73" name="LED28">
+      <node ref="D29" pin="1" pinfunction="K" />
+      <node ref="R29" pin="1" pinfunction="" />
+    </net>
+    <net code="74" name="LED29">
+      <node ref="D30" pin="1" pinfunction="K" />
+      <node ref="R30" pin="1" pinfunction="" />
+    </net>
+    <net code="75" name="LED3">
+      <node ref="D4" pin="1" pinfunction="K" />
+      <node ref="R4" pin="1" pinfunction="" />
+    </net>
+    <net code="76" name="LED30">
+      <node ref="D31" pin="1" pinfunction="K" />
+      <node ref="R31" pin="1" pinfunction="" />
+    </net>
+    <net code="77" name="LED31">
+      <node ref="D32" pin="1" pinfunction="K" />
+      <node ref="R32" pin="1" pinfunction="" />
+    </net>
+    <net code="78" name="LED4">
+      <node ref="D5" pin="1" pinfunction="K" />
+      <node ref="R5" pin="1" pinfunction="" />
+    </net>
+    <net code="79" name="LED5">
+      <node ref="D6" pin="1" pinfunction="K" />
+      <node ref="R6" pin="1" pinfunction="" />
+    </net>
+    <net code="80" name="LED6">
+      <node ref="D7" pin="1" pinfunction="K" />
+      <node ref="R7" pin="1" pinfunction="" />
+    </net>
+    <net code="81" name="LED7">
+      <node ref="D8" pin="1" pinfunction="K" />
+      <node ref="R8" pin="1" pinfunction="" />
+    </net>
+    <net code="82" name="LED8">
+      <node ref="D9" pin="1" pinfunction="K" />
+      <node ref="R9" pin="1" pinfunction="" />
+    </net>
+    <net code="83" name="LED9">
+      <node ref="D10" pin="1" pinfunction="K" />
+      <node ref="R10" pin="1" pinfunction="" />
+    </net>
+    <net code="84" name="ROW0">
+      <node ref="R1" pin="2" pinfunction="" />
+      <node ref="R17" pin="2" pinfunction="" />
+      <node ref="R25" pin="2" pinfunction="" />
+      <node ref="R9" pin="2" pinfunction="" />
+      <node ref="U4" pin="25" pinfunction="ROW0" />
+    </net>
+    <net code="85" name="ROW1">
+      <node ref="R10" pin="2" pinfunction="" />
+      <node ref="R18" pin="2" pinfunction="" />
+      <node ref="R2" pin="2" pinfunction="" />
+      <node ref="R26" pin="2" pinfunction="" />
+      <node ref="U4" pin="24" pinfunction="ROW1" />
+    </net>
+    <net code="86" name="ROW2">
+      <node ref="R11" pin="2" pinfunction="" />
+      <node ref="R19" pin="2" pinfunction="" />
+      <node ref="R27" pin="2" pinfunction="" />
+      <node ref="R3" pin="2" pinfunction="" />
+      <node ref="U4" pin="23" pinfunction="ROW2" />
+    </net>
+    <net code="87" name="ROW3">
+      <node ref="R12" pin="2" pinfunction="" />
+      <node ref="R20" pin="2" pinfunction="" />
+      <node ref="R28" pin="2" pinfunction="" />
+      <node ref="R4" pin="2" pinfunction="" />
+      <node ref="U4" pin="22" pinfunction="ROW3" />
+    </net>
+    <net code="88" name="ROW4">
+      <node ref="R13" pin="2" pinfunction="" />
+      <node ref="R21" pin="2" pinfunction="" />
+      <node ref="R29" pin="2" pinfunction="" />
+      <node ref="R5" pin="2" pinfunction="" />
+      <node ref="U4" pin="21" pinfunction="ROW4" />
+    </net>
+    <net code="89" name="ROW5">
+      <node ref="R14" pin="2" pinfunction="" />
+      <node ref="R22" pin="2" pinfunction="" />
+      <node ref="R30" pin="2" pinfunction="" />
+      <node ref="R6" pin="2" pinfunction="" />
+      <node ref="U4" pin="20" pinfunction="ROW5" />
+    </net>
+    <net code="90" name="ROW6">
+      <node ref="R15" pin="2" pinfunction="" />
+      <node ref="R23" pin="2" pinfunction="" />
+      <node ref="R31" pin="2" pinfunction="" />
+      <node ref="R7" pin="2" pinfunction="" />
+      <node ref="U4" pin="19" pinfunction="ROW6" />
+    </net>
+    <net code="91" name="ROW7">
+      <node ref="R16" pin="2" pinfunction="" />
+      <node ref="R24" pin="2" pinfunction="" />
+      <node ref="R32" pin="2" pinfunction="" />
+      <node ref="R8" pin="2" pinfunction="" />
+      <node ref="U4" pin="18" pinfunction="ROW7" />
+    </net>
+    <net code="92" name="SCL">
+      <node ref="J1" pin="4" pinfunction="Pin_4" />
+      <node ref="U1" pin="12" pinfunction="SCK" />
+      <node ref="U2" pin="12" pinfunction="SCK" />
+      <node ref="U3" pin="12" pinfunction="SCK" />
+      <node ref="U4" pin="26" pinfunction="SCL" />
+    </net>
+    <net code="93" name="SDA">
+      <node ref="J1" pin="3" pinfunction="Pin_3" />
+      <node ref="U1" pin="13" pinfunction="SDA" />
+      <node ref="U2" pin="13" pinfunction="SDA" />
+      <node ref="U3" pin="13" pinfunction="SDA" />
+      <node ref="U4" pin="27" pinfunction="SDA" />
+    </net>
+  </nets>
+</export>

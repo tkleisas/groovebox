@@ -3,7 +3,7 @@
 // Hardware-facing constants for the groovebox panel module (rev B2).
 // Docs: docs/panel-protocol.md, docs/design.md, hardware/netlist-spec.md.
 //
-// Key architecture: ALL 55 panel keys are single-ended inputs on four
+// Key architecture: ALL 55 panel keys are single-ended inputs on five
 // MCP23017 I2C expanders (switch to GND, expander pull-ups). No matrix, no
 // diodes. The HT16K33 drives the 32 LEDs only (16 step row + 16 white key).
 // Rev B2: 8 encoders (quadrature on direct GPIO, pushes on expander spare
@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-// ── I2C bus (4x MCP23017 keys, HT16K33 LEDs, 2x ADS1115 analog) ─────
+// ── I2C bus (5x MCP23017 keys, HT16K33 LEDs, 2x ADS1115 analog) ─────
 #define PANEL_I2C            i2c0
 #define PANEL_I2C_SDA_PIN    4
 #define PANEL_I2C_SCL_PIN    5
@@ -31,14 +31,14 @@
 
 #define MCP_ADDR_WHITE       0x20    // GPA0-15: white keys 0..15
 #define MCP_ADDR_BLACK       0x21    // pins 0-10: black keys 16..26,
-                                     // pins 11/12: shifts 38/39,
-                                     // pin 13: joystick SW (index 30),
-                                     // pins 14/15: encoder pushes 1/2
+                                     // pins 11/12: shifts 38/39
 #define MCP_ADDR_FN          0x22    // pins 0-9: function keys,
-                                     // pins 10-15: encoder pushes 3-8
+                                     // pin 10: joystick SW (index 30),
+                                     // pins 11-15: encoder pushes 1-5
 #define MCP_ADDR_STEP        0x23    // GPA0-15: step-row keys 40..55 (rev B)
+#define MCP_ADDR_ENC         0x24    // pins 0-2: encoder pushes 6-8
 
-#define KEY_CHIP_COUNT       4       // MCP23017 expanders on the bus
+#define KEY_CHIP_COUNT       5       // MCP23017 expanders on the bus
 #define KEY_COUNT            56      // valid key indices 0..55 (55 keys +
                                      // joystick push on index 30)
 
@@ -56,31 +56,36 @@ static const key_chip_t KEY_CHIPS[KEY_CHIP_COUNT] = {
       { 16, 17, 18, 19, 20, 21, 22, 23,         // black keys 1-11
         24, 25, 26,
         38, 39,                                  // SHIFT-L, SHIFT-R
-        30,                                      // joystick SW (moved here in B2)
-        0xFF, 0xFF } },                          // encoder pushes 1/2 (PUSH_MAP)
+        0xFF, 0xFF, 0xFF } },                    // spare (test points)
     { MCP_ADDR_FN,
       { 27, 28, 29, 31, 32, 33,                  // PLAY, STOP, REC, MODE, <, >
         34, 35, 36, 37,                          // S1-S4
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF } },  // encoder pushes 3-8 (PUSH_MAP)
+        30,                                      // joystick SW
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF } },        // encoder pushes 1-5
     { MCP_ADDR_STEP,
       { 40, 41, 42, 43, 44, 45, 46, 47,          // step row 1-16 (rev B)
         48, 49, 50, 51, 52, 53, 54, 55 } },
+    { MCP_ADDR_ENC,
+      { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF } },
 };
 
 // Encoder push-buttons (rev B2): no longer direct GPIO — they ride the
-// key-scan reads on spare expander pins. PUSH_MAP[c][pin] = encoder push
-// index 0..7 (emitted as CC 32+index, 127 press / 0 release), 0xFF = not a
-// push. Same debounce path as keys.
+// key-scan reads on the control-board expanders. PUSH_MAP[c][pin] =
+// encoder push index 0..7 (CC 32+index, 127 press / 0 release), 0xFF =
+// not a push. Same debounce path as keys.
 static const uint8_t PUSH_MAP[KEY_CHIP_COUNT][16] = {
     { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // 0x20 white: none
       0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF },
-    { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // 0x21 pins 14/15:
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,    0,    1 },    // pushes 1/2
-    { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // 0x22 pins 10-15:
-      0xFF, 0xFF,    2,    3,    4,    5,    6,    7 },    // pushes 3-8
+    { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // 0x21: none
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF },
+    { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // 0x22 pins 11-15:
+      0xFF, 0xFF, 0xFF,    0,    1,    2,    3,    4 },    // pushes 1-5
     { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // 0x23 step: none
       0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF },
-};
+    {    5,    6,    7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // 0x24 pins 0-2:
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF } };// pushes 6-8
+
 
 // ── Encoders (rev B2: 8 total) ──────────────────────────────────────
 // Quadrature A/B on 16 direct GPIO; push-buttons live on MCP23017 spare

@@ -67,8 +67,8 @@ Consequences:
 | Display | 4.0" SPI TFT 480×320 (ILI9488) — bigger pixels for eyesight; same driver, bus and 240×160@2× UI as 3.5" | $18 |
 | MX keyboard kit | 55 MX-style switches (Gateron Red / Silent Red, linear ~45 gf) + Kailh hot-swap sockets + keycap set (16 white, 11 black, 16 step row, colored function keys) | $65 |
 | Button/LED driver | HT16K33 (I2C, drives 32 LEDs: 16 step row + 16 white keys) | $3 |
-| Key input expanders | 4× MCP23017 (I2C @ 0x20–0x23, 55 single-ended key inputs) | $8 |
-| Analog inputs | 3× ADS1115 16-bit ADC (I2C, addresses 0x48 / 0x49 / 0x4a) | $9 |
+| Key input expanders | 5× MCP23017 (I2C @ 0x20–0x24, 55 single-ended key inputs) | $10 |
+| Analog inputs | 2× ADS1115 16-bit ADC (I2C, addresses 0x48 / 0x49) | $6 |
 | Pitch/mod | 2-axis spring-return thumbstick (X = pitch bend, Y = mod) | $4 |
 | Pots | 6× 10k linear: cutoff, resonance, A, D, S, R | $7 |
 | Data slider | 60 mm slide pot (velocity default; live filter/FX sweeps) | $3 |
@@ -102,7 +102,7 @@ Consequences:
 - **< / >** keys: previous/next event, page, or preset.
 - **4 soft menu keys** under the screen: functions shown as on-screen
   labels directly above each key (MPC-style menus, no legend needed).
-- 4 encoders with push (pageable parameters).
+- 4 pageable encoders with push; rev B2 adds 4 amp-ADSR encoders (8 total).
 - **8 encoders total (rev B2)**: 4 pageable + 4 dedicated amp-ENV
   A/D/S/R (relative control — no pickup; envelope follows the track).
   Encoder push-buttons live on spare MCP23017 inputs (quadrature stays on
@@ -143,14 +143,14 @@ sequencer, per-step LEDs), 1u SHIFT keys at the piano row ends, horizontal
 | Peripheral | Connection | Role |
 |---|---|---|
 | HT16K33 | I2C @ 0x70 | 32 LEDs: 16 step-row + 16 white-key (driver only) |
-| 4× MCP23017 | I2C @ 0x20 / 0x21 / 0x22 / 0x23 | 55 keys + 8 encoder push-buttons, single-ended (64 available: 63 used) |
+| 5× MCP23017 | I2C @ 0x20 / 0x21 / 0x22 / 0x23 / 0x24 | 55 keys + 8 encoder push-buttons, single-ended (80 available: 63 used) |
 | 2× ADS1115 | I2C @ 0x48 / 0x49 | 5 analog inputs: 2 pots (CUT/RES) + slider + joystick (X/Y) |
 | 8 encoders | direct GPIO (16 pins, quadrature A/B only) | encoders 1–4 pageable, 5–8 = ADSR |
 
 Notes:
 - All 55 keys (16 white + 11 black piano + **16 step row (rev B)** +
   3 transport + 4 soft + MODE + < + > + 2 SHIFT) are **single-ended inputs
-  on four MCP23017 I²C expanders** — one uniform scan path, no matrix and
+  on five MCP23017 I²C expanders** — one uniform scan path, no matrix and
   no per-key diodes (rev A deviation from the original HT16K33-matrix plan:
   the function keys are physically distributed across the panel, and
   expanders keep the board-to-board link at 4 wires with every key
@@ -188,9 +188,9 @@ controller mapping in emulator → M3 cross-compile to Pi, Pi HAL backend,
 CPU profiling (Zero 2W viability gate) → M4 bench rig → M5 battery +
 enclosure.
 
-**Panel module (Raspberry Pi Pico).** All panel I/O — 39 single-ended keys
-on 3× MCP23017, 16 in-switch LEDs on HT16K33 (driver only), 4 encoders,
-3× ADS1115 analog — is handled by a Pico (RP2040, native USB device via
+**Panel module (Raspberry Pi Pico).** All panel I/O — 55 single-ended keys
+on 5× MCP23017, 32 in-switch LEDs on HT16K33 (driver only), 8 encoders,
+2× ADS1115 analog — is handled by a Pico (RP2040, native USB device via
 TinyUSB) which presents itself to the Pi as a **USB-MIDI controller**. Keys
 → note on/off, pots/slider/joystick → CCs, encoders → relative CCs; LEDs
 are driven by MIDI back to the panel; a SysEx layer (protocol doc)

@@ -17,10 +17,10 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
 | | NSR-1 (ΟΡΓΑΝΟ 1) | NSR-2 |
 |---|---|---|
 | Concept | full-size panel, 400 × 150 mm | compact, 180 × 210 mm faceplate PCB |
-| Keys | 27 MX keys (piano row) + 12 function | 45 Choc keys (4×8 grid) + 13 function |
-| Control | 4 encoders, 6 pots, data slider, thumbstick | 4 encoders, thumbstick, crossfader |
-| Status | design + hardware spec rev A, KiCad skeletons | schematic-complete, **0 ERC errors**, footprints assigned |
-| Docs | [`docs/design.md`](docs/design.md) | [`docs/nsr2-design.md`](docs/nsr2-design.md) + [`nsr2/README.md`](nsr2/README.md) |
+| Keys | 55 MX keys (piano + 16-step row + function) | 45 Choc keys (4×8 grid) + 13 function |
+| Control | 8 encoders, 2 pots, data slider, thumbstick | 4 encoders, thumbstick, crossfader |
+| Status | rev B2 schematics + ERC 0 errors; outlines updated, layout pending | schematic-complete, **0 ERC errors**, footprints assigned |
+| Docs | [`docs/design.md`](docs/design.md) + [`hardware/README.md`](hardware/README.md) | [`docs/nsr2-design.md`](docs/nsr2-design.md) + [`nsr2/README.md`](nsr2/README.md) |
 
 ## What it does (emulator, today)
 
@@ -38,17 +38,17 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
   Wavetable, Granular, …) + one insert FX slot per track (29 effect types).
 - **Sampling**: SAMPLE page — record from mic/line-in, trim, normalize,
   assign to a drum pad; LOAD page browses samples.
-- **Controls (NSR-1)**: 6 dedicated pots (filter cutoff/resonance + amp ADSR
-  — strict one-parameter-one-control rule), 4 pageable encoders with push,
-  data slider, 2-axis spring-return thumbstick, transport, MODE, </>,
-  4 soft keys, dual SHIFT keys at the keyboard row ends.
+- **Controls (NSR-1 rev B2)**: 2 dedicated pots (filter cutoff/resonance),
+  8 encoders with push (4 pageable + 4 amp-ADSR), data slider, 2-axis
+  spring-return thumbstick, transport, MODE, </>, 4 soft keys, dual SHIFT
+  keys at the keyboard row ends, dedicated 16-step row.
 - **UI**: Elektron-style monochrome, 3 themes (mono / red / green phosphor),
   ПОЕХАЛИ! boot splash, full widget library (sequencer, mixer, waveform,
   ADSR, FM-algo, spectrum, phase pie, tuner, file browser, virtual keyboard…).
 - **Sync/IO**: DIN MIDI in/out, Ableton Link (engine), USB-MIDI on OTG,
   integrated mic + line in for sampling (WM8731 codec).
 
-## Hardware (NSR-1, rev A)
+## Hardware (NSR-1, rev B2)
 
 | | |
 |---|---|
@@ -56,10 +56,10 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
 | Panel controller | Raspberry Pi Pico — presents as USB-MIDI device `groovebox-panel` |
 | Audio codec | Audio Injector Zero (WM8731: stereo out + mic/line in). Bench rig: CJMCU-1334 (UDA1334A, playback only) |
 | Display | 4.0" SPI TFT 480×320 (ILI9488); UI rendered at 240×160, 2× integer scale |
-| Keys | 39 MX-style switches (Gateron Red / Silent Red), hot-swap sockets, per-key LEDs (whites), 19.05 mm pitch |
-| Panel I/O | 3× MCP23017 (39 single-ended keys), HT16K33 (16 LEDs), 3× ADS1115 (6 pots + slider + joystick) |
+| Keys | 55 MX-style switches (Gateron Red / Silent Red), hot-swap sockets, 32 LEDs, 19.05 mm pitch |
+| Panel I/O | 5× MCP23017 (55 keys + 8 encoder pushes), HT16K33 (32 LEDs), 2× ADS1115 (2 pots + slider + joystick) |
 | Power | LiPo + Adafruit PowerBoost 1000C |
-| Panel size | 400×150 mm, deep red |
+| Panel size | 400×170 mm, deep red |
 
 Full hardware design, GPIO maps and BOM: [docs/design.md](docs/design.md).
 Panel/brain protocol (USB-MIDI + SysEx config):
@@ -69,10 +69,10 @@ Panel/brain protocol (USB-MIDI + SysEx config):
 
 ```
   Pi Zero 2W (brain)                      Pico (panel module)
-  ├ yawn engine (I2S codec)      ◄─USB─►  ├ keys    (3× MCP23017)
+  ├ yawn engine (I2S codec)      ◄─USB─►  ├ keys    (5× MCP23017)
   ├ fbdev UI → 480×320 SPI TFT            ├ LEDs    (HT16K33)
   ├ DIN MIDI in/out (UART)                ├ encoders (GPIO)
-  └ mic (codec input)                     └ analog  (3× ADS1115)
+  └ mic (codec input)                     └ analog  (2× ADS1115)
 ```
 
 The panel is deliberately dumb — it reports physical events and accepts
@@ -90,7 +90,7 @@ for the wire protocol.
 | Emulator | CMake in `emulator/` (binary `groovebox_sim`) | MSVC or GCC, SDL3, yawn submodule (`git submodule update --init`) |
 | Panel firmware | `panel-fw/build.ps1` or CMake with the Pico SDK (see `panel-fw/README.md`) | Pico SDK + toolchain |
 | OS image | Raspberry Pi OS Lite + `os-image/customize/` (first-run script, systemd unit) | a Pi / imager |
-| Hardware | KiCad 10; NSR-2 schematics are **generated** — see [`nsr2/README.md`](nsr2/README.md) before touching them | KiCad 10.0+ |
+| Hardware | KiCad 10; NSR-1 and NSR-2 schematics are **generated** — see [`hardware/README.md`](hardware/README.md) and [`nsr2/README.md`](nsr2/README.md) before touching them | KiCad 10.0+ |
 
 Windows/MSVC emulator build:
 
@@ -230,7 +230,7 @@ semantics, LED count) for interactive, test, and dump modes
 | `docs/` | design documents: NSR-1 `design.md`, panel ↔ brain protocol (`panel-protocol.md`), NSR-2 `nsr2-design.md`, mockups & generated charts |
 | `emulator/` | the groovebox app + device emulator (`hal.h`, SimBackend = SDL3 desktop, PiBackend = headless Pi fbdev+RtMidi, PanelView, ui, widgets, font5x7, pattern…), `pi/` = arm64 cross-build (Dockerfile + toolchain) |
 | `panel-fw/` | Raspberry Pi Pico firmware (TinyUSB USB-MIDI panel controller, protocol v1 + GRV SysEx config) |
-| `hardware/` | NSR-1 hardware: netlist spec + KiCad projects (keyboard & control boards) |
+| `hardware/` | NSR-1 rev B2 hardware: netlist spec, generator/verifier, generated schematics, KiCad projects (keyboard & control boards) |
 | `nsr2/` | the NSR-2 compact variant: netlist spec, generated KiCad schematics, footprint library, enclosure spec, mockup |
 | `os-image/` | Raspberry Pi OS Lite customization — boots straight into the app (~10 s to sound) |
 | `tools/` | mockup generators (panel, UI), rgb565 conversion |
@@ -271,8 +271,9 @@ Software milestones (emulator-first):
 
 - Commit messages: `area: summary` (`panel-fw:`, `os-image:`, `nsr2:`, `docs:`).
 - Generated files are marked as such in their directories — read
-  [`nsr2/README.md`](nsr2/README.md) before hand-editing anything in
-  `nsr2/hardware/`.
+  [`hardware/README.md`](hardware/README.md) and
+  [`nsr2/README.md`](nsr2/README.md) before hand-editing generated
+  schematics.
 - Per-device credentials never enter the repo (see `os-image/customize/`).
 - License: MIT (see [`LICENSE`](LICENSE)). Vendored third-party hardware
   libraries keep their own licenses — see the footprints table in

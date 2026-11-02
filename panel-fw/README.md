@@ -1,7 +1,7 @@
 # groovebox-panel firmware
 
 Panel module firmware for the groovebox control surface: a Raspberry Pi Pico
-scanning 55 single-ended keys plus 8 encoder pushes on 4x MCP23017 expanders,
+scanning 55 single-ended keys plus 8 encoder pushes on 5x MCP23017 expanders,
 2x ADS1115 analog inputs (CUT/RES pots, slider, joystick X/Y), 8 encoders
 (5-8 = ADSR) and 32 LEDs driven by an HT16K33 (LED driver only,
 no key matrix), presenting everything as a stock USB-MIDI device named
@@ -17,7 +17,7 @@ LEDs and the host velocity register on ch2, GRV SysEx 0x7D configuration).
     src/main.c              superloop + 1 ms tick
     src/usb_descriptors.c   "groovebox-panel" MIDI device (VID 0x2E8A, PID 0x4720)
     src/midi.c/.h           TX helpers + RX parser (ch2 notes/CC27/SysEx)
-    src/keys.c/.h           55 keys + 8 encoder pushes on 4x MCP23017, debounced scan
+    src/keys.c/.h           55 keys + 8 encoder pushes on 5x MCP23017, debounced scan
     src/ads1115.c/.h        2 chips round-robin, ~125 Hz/channel, hysteresis
     src/encoder.c/.h        8x quadrature IRQ (pushes ride the key scan)
     src/leds.c/.h           32-LED RAM mapping (HT16K33 LED driver) + re-assert

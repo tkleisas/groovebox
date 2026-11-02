@@ -25,7 +25,7 @@
 	(net 0 "")
 	(gr_line
 		(start 0 0)
-		(end 90 0)
+		(end 100 0)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -34,8 +34,8 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000064")
 	)
 	(gr_line
-		(start 90 0)
-		(end 90 70)
+		(start 100 0)
+		(end 100 80)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -44,8 +44,8 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000065")
 	)
 	(gr_line
-		(start 90 70)
-		(end 0 70)
+		(start 100 80)
+		(end 0 80)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -54,7 +54,7 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000066")
 	)
 	(gr_line
-		(start 0 70)
+		(start 0 80)
 		(end 0 0)
 		(stroke
 			(width 0.05)
@@ -75,8 +75,8 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000068")
 	)
 	(gr_circle
-		(center 85 5)
-		(end 86.6 5)
+		(center 95 5)
+		(end 96.6 5)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -86,8 +86,8 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-000000000069")
 	)
 	(gr_circle
-		(center 5 65)
-		(end 6.6 65)
+		(center 5 75)
+		(end 6.6 75)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -97,8 +97,8 @@
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-00000000006a")
 	)
 	(gr_circle
-		(center 85 65)
-		(end 86.6 65)
+		(center 95 75)
+		(end 96.6 75)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -107,17 +107,15 @@
 		(layer "Edge.Cuts")
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-00000000006b")
 	)
-	(gr_text
-		(at 45.0 76.0)
+	(gr_text "control board rev B2 - 100x80mm - M3 at corners - Pico micro-USB flush with bottom edge"
+		(at 50.0 86.0)
 		(layer "Cmts.User")
 		(uuid "0d5ea1b2-89f0-4a3b-9cde-00000000006c")
-		(hide no)
 		(effects
 			(font
 				(size 2 2)
 				(thickness 0.3)
 			)
 		)
-		"control board rev A - 90x70mm - M3 at corners - Pico micro-USB flush with bottom edge"
 	)
 )
