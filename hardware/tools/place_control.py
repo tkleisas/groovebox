@@ -2,7 +2,7 @@
 """Initial placement pass for the NSR-1 control board.
 
 Loads every component from the generated netlist, assigns its pads to the
-schematic nets, and places it on the 100 x 80 mm rev B2 outline.  This is a
+schematic nets, and places it on the 130 x 100 mm rev B2 outline.  This is a
 floorplan, not a routed board; run it from the KiCad 10 container so the
 official footprint libraries are available.
 """
@@ -21,10 +21,10 @@ CUSTOM_LIB = ROOT / "hardware" / "nsr1_footprints.pretty"
 
 # ref: (x_mm, y_mm, rotation_deg)
 PLACEMENT = {
-    "J1": (60, 50, 0),          # Pico, USB toward the bottom edge
+    "J1": (65, 55, 180),        # Pico module, USB toward the bottom edge
 
     # Top edge: function keys.
-    **{f"J{i}": (11.5 + (i - 7) * 8.5, 10.5, 0) for i in range(7, 17)},
+    **{f"J{i}": (13.5 + (i - 7) * 8.5, 10.5, 0) for i in range(7, 17)},
 
     # Left edge: pots, slider, joystick.
     "J2": (13, 22, 90),
@@ -34,33 +34,31 @@ PLACEMENT = {
     "J6": (13, 82, 90),
 
     # Right side: two columns of four encoder headers.
-    **{f"J{i}": (97, 18 + (i - 17) * 20, 90) for i in range(17, 21)},
-    **{f"J{i}": (110, 18 + (i - 21) * 20, 90) for i in range(21, 25)},
+    **{f"J{i}": (100, 10 + (i - 17) * 20, 90) for i in range(17, 21)},
+    **{f"J{i}": (115, 10 + (i - 21) * 20, 90) for i in range(21, 25)},
 
     # Bottom edge: serial + keyboard links.
     "J25": (30, 85, 0),
     "J26": (50, 85, 0),
 
-    "U1": (80, 30, 0),
-    "U2": (80, 45, 0),
+    "U1": (82, 30, 0),
+    "U2": (82, 45, 0),
     "U3": (40, 30, 0),
     "U4": (40, 45, 0),
-    "SW1": (85, 72, 0),
+    "SW1": (82, 72, 0),
 
-    # Analog RC filters (R then C on the filtered node).
-    "R1": (65, 27, 0), "C1": (72, 27, 0),
-    "R2": (65, 34, 0), "C2": (72, 34, 0),
-    "R3": (65, 41, 0), "C3": (72, 41, 0),
-    "R4": (65, 48, 0), "C4": (72, 48, 0),
-    "R5": (65, 55, 0), "C5": (72, 55, 0),
+    # Analog RC filters, left of the Pico module.
+    "R1": (20, 25, 0), "C1": (26, 25, 0),
+    "R2": (20, 32, 0), "C2": (26, 32, 0),
+    "R3": (20, 39, 0), "C3": (26, 39, 0),
+    "R4": (20, 46, 0), "C4": (26, 46, 0),
+    "R5": (20, 53, 0), "C5": (26, 53, 0),
 
-    # I2C pull-ups.
-    "R6": (70, 68, 0), "R7": (76, 68, 0),
-
-    # IC decoupling and Pico rails.
-    "C6": (30, 58, 0), "C7": (35, 58, 0), "C8": (45, 58, 0),
-    "C9": (70, 60, 0), "C10": (76, 60, 0),
-    "C11": (30, 70, 0), "C12": (36, 70, 0),
+    # I2C pull-ups and Pico rail decoupling, lower-left.
+    "R6": (20, 70, 0), "R7": (26, 70, 0),
+    "C6": (20, 58, 0), "C7": (26, 58, 0), "C8": (32, 58, 0),
+    "C9": (20, 64, 0), "C10": (26, 64, 0),
+    "C11": (32, 64, 0), "C12": (38, 64, 0),
 }
 
 
@@ -93,6 +91,7 @@ def main() -> None:
             continue
         board.Remove(fp)
     board.GetDesignSettings().m_MinClearance = pcbnew.FromMM(0.15)
+    board.GetDesignSettings().m_TrackMinWidth = pcbnew.FromMM(0.1)
     board.GetDesignSettings().m_NetSettings.GetDefaultNetclass().SetClearance(pcbnew.FromMM(0.15))
     nets = {}
     for comp in components:
@@ -107,10 +106,18 @@ def main() -> None:
         fp.SetValue(comp["value"])
         x, y, angle = PLACEMENT[ref]
         fp.SetOrientationDegrees(angle)
-        bbox = fp.GetBoundingBox(False, False)
-        offset = bbox.GetCenter() - fp.GetPosition()
         target = pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y))
-        fp.SetPosition(target - offset)
+        if ref == "J1":
+            pads = list(fp.Pads())
+            xs = [p.GetPosition().x for p in pads]
+            ys = [p.GetPosition().y for p in pads]
+            center = pcbnew.VECTOR2I((min(xs) + max(xs)) // 2,
+                                     (min(ys) + max(ys)) // 2)
+            fp.SetPosition(target - (center - fp.GetPosition()))
+        else:
+            bbox = fp.GetBoundingBox(False, False)
+            offset = bbox.GetCenter() - fp.GetPosition()
+            fp.SetPosition(target - offset)
         board.Add(fp)
         for pad in fp.Pads():
             net_name = pin_nets.get((ref, pad.GetNumber()))

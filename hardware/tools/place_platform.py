@@ -27,18 +27,18 @@ BOARDS = {
             "C3": "B", "C4": "B",
         },
         "pos": {
-            "J1": (20, 50, 90), "J2": (50, 12, 90),
+            "J1": (42, 50, 90), "J2": (50, 12, 90),
             "J3": (96, 22, 90), "J4": (96, 52, 90),
             "J5": (88, 78, 0), "J6": (14, 82, 0),
             "J7": (28, 82, 0), "J8": (42, 82, 0),
             "J9": (56, 82, 0), "J10": (70, 82, 0),
-            "J11": (65, 35, 0), "SW1": (15, 38, 0),
+            "J11": (60, 25, 0), "SW1": (10, 72, 0),
             "U1": (20, 20, 0), "U2": (35, 20, 0),
             "R1": (30, 30, 0), "R2": (30, 36, 0),
-            "R3": (42, 30, 0), "R4": (60, 65, 90),
-            "R5": (68, 65, 90), "C1": (52, 65, 90),
-            "C2": (44, 65, 90), "C3": (36, 65, 90),
-            "C4": (28, 65, 90),
+            "R3": (42, 30, 0), "R4": (60, 70, 90),
+            "R5": (68, 70, 90), "C1": (52, 70, 90),
+            "C2": (44, 70, 90), "C3": (36, 70, 90),
+            "C4": (28, 70, 90),
         },
     },
     "power": {
@@ -149,8 +149,17 @@ def place(name, spec):
         print(f"{name}: place {ref} {meta['footprint']}", flush=True)
         fp.SetReference(ref)
         fp.SetValue(meta["value"])
-        fp.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y)))
         fp.SetOrientationDegrees(rot)
+        target = pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y))
+        if ref == "J1":
+            pads = list(fp.Pads())
+            xs = [p.GetPosition().x for p in pads]
+            ys = [p.GetPosition().y for p in pads]
+            center = pcbnew.VECTOR2I((min(xs) + max(xs)) // 2,
+                                     (min(ys) + max(ys)) // 2)
+            fp.SetPosition(target - (center - fp.GetPosition()))
+        else:
+            fp.SetPosition(target)
         board.Add(fp)
         if spec["side"].get(ref, "F") == "B":
             fp.Flip(fp.GetPosition(), False)

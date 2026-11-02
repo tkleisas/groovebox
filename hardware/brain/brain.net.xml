@@ -28,7 +28,7 @@
     </comp>
     <comp ref="J1">
       <value>Pi_Zero_2W</value>
-      <footprint>Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical</footprint>
+      <footprint>Module:Raspberry_Pi_Zero_Socketed_THT_FaceDown_MountingHoles</footprint>
       <libsource lib="Connector_Generic" part="Conn_02x20_Odd_Even" />
     </comp>
     <comp ref="J10">

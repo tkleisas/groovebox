@@ -86,7 +86,7 @@ micro-B-to-USB-A cable.
 
 | Ref | Type | Pinout |
 |---|---|---|
-| J1 | 2×20 female header | Pi Zero 2W socket, physical pin numbering |
+| J1 | 2×20 socket module | `Module:Raspberry_Pi_Zero_Socketed_THT_FaceDown_MountingHoles`; 2.54 mm row spacing, four mounting holes, physical pin numbering |
 | J2 | DIN-5 right-angle | MIDI OUT: 2=GND, 4=TX via 33 Ω, 5=GND |
 | J3 | DIN-5 right-angle | MIDI IN: 2=GND, 4=opto input via 220 Ω, 5=opto return; 6N138 → RX |
 | J4 | 1×08 right-angle header | ILI9488: 1=3V3, 2=GND, 3=CS, 4=RST, 5=DC, 6=MOSI, 7=SCLK, 8=BL |

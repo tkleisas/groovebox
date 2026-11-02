@@ -6,6 +6,7 @@ import pcbnew
 
 ROOT = Path(__file__).resolve().parents[2]
 BOARDS = {
+    "control": ROOT / "hardware" / "control" / "control.kicad_pcb",
     "brain": ROOT / "hardware" / "brain" / "brain.kicad_pcb",
     "power": ROOT / "hardware" / "power" / "power.kicad_pcb",
 }

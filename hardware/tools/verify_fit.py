@@ -38,8 +38,8 @@ def main() -> None:
     errors = []
     if keyboard != (356.0, 80.0):
         errors.append(f"keyboard is {keyboard}, expected (356.0, 80.0)")
-    if control != (120.0, 90.0):
-        errors.append(f"control is {control}, expected (120.0, 90.0)")
+    if control != (130.0, 100.0):
+        errors.append(f"control is {control}, expected (130.0, 100.0)")
     if not contains(PANEL, KEYBOARD_ORIGIN, keyboard):
         errors.append("keyboard does not fit the 400 x 170 panel")
     if not contains((KEYBOARD_ORIGIN[0] + keyboard[0], KEYBOARD_ORIGIN[1] + keyboard[1]), CONTROL_ORIGIN, control):

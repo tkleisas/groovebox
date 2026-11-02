@@ -102,9 +102,9 @@ The NSR-1 platform is four boards plus the enclosure:
 | Board | Role | Status |
 |---|---|---|
 | Keyboard | 45 piano/step keys, 3× MCP23017, HT16K33, 32 LEDs | routed, 0 DRC |
-| Control | Pico panel module, analog/encoder/key connectors | routed, 0 DRC |
-| Brain carrier | Pi Zero 2W socket, Audio Injector stack, display, DIN MIDI, panel USB | rev A schematic generated, netlist EMD-valid |
-| Power/battery | USB-C charge, 1S pack, gauge, 5V/3A boost, power path | 100 × 70, 4-layer, routed except 2 BAT_NEG airwires |
+| Control | Pico module (2×20, 17.78 mm rows) + analog/encoder/key connectors | 130 × 100, routed, 0 DRC |
+| Brain carrier | Pi Zero 2W socketed module, Audio Injector stack, display, DIN MIDI, panel USB | rev A, routed, 0 unconnected |
+| Power/battery | USB-C charge, 1S pack, gauge, 5V/3A boost, power path | 100 × 70, 4-layer, routed except 4 airwires |
 
 The brain carrier is SBC-specific by design. The Pi Zero 2W carrier is the
 first one; a Radxa Zero 3W or Orange Pi Zero 3W carrier would be a separate

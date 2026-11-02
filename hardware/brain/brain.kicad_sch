@@ -6655,7 +6655,7 @@
 			(at 44.45 105.41 0)
 			(effects (font (size 1.27 1.27)))
 		)
-		(property "Footprint" "Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical"
+		(property "Footprint" "Module:Raspberry_Pi_Zero_Socketed_THT_FaceDown_MountingHoles"
 			(at 44.45 100.33 0)
 			(hide yes)
 			(effects (font (size 1.27 1.27)))
@@ -6665,7 +6665,7 @@
 			(hide yes)
 			(effects (font (size 1.27 1.27)))
 		)
-		(property "Description" "2x20 female header (Pi Zero 2W socket)"
+		(property "Description" "Raspberry Pi Zero 2W socketed module (2x20, mounting holes)"
 			(at 44.45 100.33 0)
 			(hide yes)
 			(effects (font (size 1.27 1.27)))

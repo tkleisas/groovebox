@@ -68,7 +68,7 @@
     </comp>
     <comp ref="J1">
       <value>Pi_Pico</value>
-      <footprint>Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical</footprint>
+      <footprint>Module:RaspberryPi_Pico_Common_THT</footprint>
       <libsource lib="Connector_Generic" part="Conn_02x20_Odd_Even" />
     </comp>
     <comp ref="J10">

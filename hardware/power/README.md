@@ -5,8 +5,7 @@ the NSR-1 platform and future SBC carriers.
 
 ## Status
 
-- `power.kicad_pcb` — 100 × 70 mm, 4-layer, 4× M3 holes; routed except two
-  BAT_NEG rev A airwires.
+- `power.kicad_pcb` — 100 × 70 mm, 4-layer, 4× M3 holes; routed except four rev A airwires (two BAT_NEG, two SCL).
 - `power.kicad_sch` — generated from `hardware/tools/gen_schematics.py`;
   0 ERC errors with expected embedded-symbol warnings.
 - Power-board and battery bays are specified in

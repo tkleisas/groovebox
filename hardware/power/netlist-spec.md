@@ -1,7 +1,7 @@
 # NSR-1 power/battery board — rev A
 
 Status: **rev A schematic and layout.** This board is common to the NSR-1
-platform and to future SBC carriers; two BAT_NEG links remain as airwires. It is deliberately separate from the brain carrier.
+platform and to future SBC carriers; four links remain as rev A airwires (two BAT_NEG, two SCL). It is deliberately separate from the brain carrier.
 
 Source of truth for this board. Platform policy is in
 [`../../docs/mission.md`](../../docs/mission.md).

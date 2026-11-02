@@ -141,8 +141,8 @@ def control(lib, date):
         pico[p] = "@GND"
     pico_nc = [14, 15, 16, 17, 32, 34, 35, 37, 39]
     b.place("Connector_Generic:Conn_02x20_Odd_Even", "J", "Pi_Pico",
-            45, 110, "Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical",
-            "2x20 female headers (Raspberry Pi Pico module)", pico, pico_nc)
+            45, 110, "Module:RaspberryPi_Pico_Common_THT",
+            "Raspberry Pi Pico module (2x20, 17.78 mm row spacing)", pico, pico_nc)
 
     _ads(b, "U1", 270, 55, "@GND",
          ["CUT", "RES", "SLIDER", "JOY_Y"], "CUT/RES/slider/joystick Y (0x48)")
@@ -313,8 +313,8 @@ def brain(lib, date):
         pi[p] = "@GND"
     pi_nc = [7, 12, 16, 21, 26, 27, 28, 29, 31, 32, 33, 35, 36, 37, 38, 40]
     b.place("Connector_Generic:Conn_02x20_Odd_Even", "J", "Pi_Zero_2W",
-            45, 100, "Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical",
-            "2x20 female header (Pi Zero 2W socket)", pi, pi_nc)
+            45, 100, "Module:Raspberry_Pi_Zero_Socketed_THT_FaceDown_MountingHoles",
+            "Raspberry Pi Zero 2W socketed module (2x20, mounting holes)", pi, pi_nc)
 
     b.place("Connector_Generic:Conn_01x08", "J", "ILI9488_4.0in",
             230, 45, "Connector_PinHeader_2.54mm:PinHeader_1x08_P2.54mm_Horizontal",

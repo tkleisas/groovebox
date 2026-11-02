@@ -41252,6 +41252,28 @@
 		(layer "Edge.Cuts")
 		(uuid "81d8bf15-afa3-411a-9c5f-ab4cbd5947cf")
 	)
+	(gr_text "1"
+		(at 28.05 6.274999 0)
+		(layer "F.SilkS")
+		(uuid "49701c80-59b7-449d-a4ff-758f0d03e5f2")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.12)
+			)
+		)
+	)
+	(gr_text "J1 I2C LINK"
+		(at 26.25 -1.525 0)
+		(layer "F.SilkS")
+		(uuid "421a9527-eeb6-4ce8-9f33-b90fd836238a")
+		(effects
+			(font
+				(size 0.8 0.8)
+				(thickness 0.12)
+			)
+		)
+	)
 	(segment
 		(start 116.5 50.775)
 		(end 121.4134 50.775)
@@ -61699,6 +61721,28 @@
 				(xy 3.541392 4.025382) (xy 3.426657 4.224109) (xy 3.42665 4.224123) (xy 3.338842 4.436112) (xy 3.279453 4.657759)
 				(xy 3.279451 4.65777) (xy 3.2495 4.885258) (xy 0.5005 4.885258) (xy 0.5005 0.6245) (xy 0.520185 0.557461)
 				(xy 0.572989 0.511706) (xy 0.6245 0.5005) (xy 355.3755 0.5005)
+			)
+		)
+	)
+	(gr_text "J1 I2C LINK"
+		(at 26.2500 -1.5250 0)
+		(layer "F.SilkS")
+		(uuid "366554cd-5167-5505-8a2d-0efee776a88f")
+		(effects
+			(font
+				(size 0.80 0.80)
+				(thickness 0.12)
+			)
+		)
+	)
+	(gr_text "1"
+		(at 28.0500 6.2750 0)
+		(layer "F.SilkS")
+		(uuid "c47c1756-188d-5fa5-b518-b537d641fb82")
+		(effects
+			(font
+				(size 0.80 0.80)
+				(thickness 0.12)
 			)
 		)
 	)

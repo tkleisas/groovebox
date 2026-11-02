@@ -13,6 +13,7 @@ import pcbnew
 ROOT = Path(__file__).resolve().parents[2]
 MOUNT_LIB = "/usr/share/kicad/footprints/MountingHole.pretty"
 BOARDS = (
+    ("control", 130, 100, "NSR-1 CONTROL - 130x100mm - M3"),
     ("brain", 110, 90, "NSR-1 BRAIN CARRIER - Pi Zero 2W - 110x90mm - M3"),
     ("power", 100, 70, "NSR-1 POWER BOARD - 1S 5000mAh - 100x70mm - M3"),
 )
@@ -73,8 +74,11 @@ def make_board(name, width, height, title):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--only", choices=[b[0] for b in BOARDS])
     args = parser.parse_args()
     for name, width, height, title in BOARDS:
+        if args.only and name != args.only:
+            continue
         out = ROOT / "hardware" / name / f"{name}.kicad_pcb"
         if out.exists() and not args.force:
             print("skip existing", out)

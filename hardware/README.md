@@ -11,7 +11,7 @@ The NSR-1 platform has four boards:
 | Keyboard | [`netlist-spec.md`](netlist-spec.md) | routed, 0 DRC, EMD-verified |
 | Control | [`netlist-spec.md`](netlist-spec.md) | routed, 0 DRC, EMD-verified |
 | Brain carrier (Pi Zero 2W) | [`brain/netlist-spec.md`](brain/netlist-spec.md) | 110 × 90, routed, 0 unconnected, 4× M3 |
-| Power/battery | [`power/netlist-spec.md`](power/netlist-spec.md) | 100 × 70, 4-layer, routed except 2 BAT_NEG links |
+| Power/battery | [`power/netlist-spec.md`](power/netlist-spec.md) | 100 × 70, 4-layer, routed except 4 airwires |
 
 The control and keyboard boards are the existing rev B2 design. The brain
 carrier and power board are new platform boards; their specs are the source of
@@ -43,6 +43,8 @@ python3 hardware/tools/add_ground_pour.py keyboard
 python3 hardware/tools/verify_fit.py
 # New platform outlines (run in the KiCad container):
 python3 hardware/tools/make_platform_outlines.py
+# Add header/connector silkscreen labels once, after routing:
+python3 hardware/tools/add_board_labels.py control keyboard brain power
 ```
 
 `gen_schematics.py` uses the KiCad 10 symbol definitions embedded in the
@@ -72,7 +74,7 @@ gcc -std=c11 -Ipanel-fw/src hardware/tools/check_board_config.c -o /tmp/check_bo
 /tmp/check_board_config
 ```
 
-The control/keyboard board outlines are rev B2: control 120 × 90 mm,
+The control/keyboard board outlines are rev B2: control 130 × 100 mm,
 keyboard 356 × 80 mm. Both boards are placed, routed, and checked. The MX
 hot-swap footprint is vendored from the keyswitch-kicad-library (`nsr1_fp`,
 CC-BY-SA 4.0) and is assigned to all 45 switch symbols.
@@ -81,8 +83,14 @@ The brain carrier is the first SBC-specific board. It is a Raspberry Pi Zero
 2W carrier by design; Radxa Zero 3W and Orange Pi Zero 3W would each get a
 separate carrier and validation effort. The power board is common to all
 carriers. Brain carrier: 110 × 90 mm, routed, 0 unconnected, EMD-valid
-netlist. Power board: 100 × 70 mm, 4-layer, routed except two BAT_NEG links
-that remain as rev A airwires. Start from their netlist specs.
+netlist. Power board: 100 × 70 mm, 4-layer, routed except four rev A airwires
+(two BAT_NEG, two SCL). Start from their netlist specs.
+
+The Pico uses `Module:RaspberryPi_Pico_Common_THT` (2×20, 17.78 mm row
+spacing, four mounting holes). The Pi Zero uses
+`Module:Raspberry_Pi_Zero_Socketed_THT_FaceDown_MountingHoles` (2×20, 2.54 mm
+row spacing, mounting holes). Both headers carry silkscreen pin numbers; the
+Pico also carries GPIO names.
 
 ## KiCad checks
 
@@ -97,7 +105,7 @@ docker run --rm -v "$PWD:/work" -w /work kicad/kicad:10.0 \
 Current result: **0 ERC errors** for control, keyboard, brain, and power.
 Expected warnings are `lib_symbol_mismatch` from the embedded symbol copies
 (cosmetic). Routed control/keyboard/brain DRC is clean with 0 unconnected
-items; the power board is routed except two `BAT_NEG` airwires.
+items; the power board is routed except four rev A airwires (two `BAT_NEG`, two `SCL`).
 
 Generate Gerbers, drill files, position CSV, BOM, STEP, stats, and zip
 archives with:
@@ -120,7 +128,7 @@ model because the KiCad container does not ship the 3D model library. Set
   3× MCP23017, HT16K33, 32 LEDs.
 - **Control board:** placed and routed with 0 DRC violations and 0 unconnected
   items. Routing was done with Freerouting 2.5 via Specctra DSN/SES at
-  0.15 mm minimum track width/clearance; the board grew to 120 × 90 mm to
+  0.15 mm clearance and a 0.1 mm minimum track width; the board grew to 130 × 100 mm to
   clear the eight encoder headers. Four M3 mounting-hole footprints are
   present for EMD mechanical ports.
 - **Keyboard board:** all 45 switches, 32 LEDs, 32 resistors, 3 key expanders,
@@ -136,11 +144,11 @@ model because the KiCad container does not ship the 3D model library. Set
   Audio Injector Zero stack, display header, DIN MIDI, panel USB breakout, and
   5V input. It deliberately does not contain the battery charger or boost.
 - **Power/battery board:** 100 × 70 mm, 4-layer, schematic generated and
-  routed except two BAT_NEG links (rev A airwires); see
+  routed except four rev A airwires (two BAT_NEG, two SCL); see
   [`power/netlist-spec.md`](power/netlist-spec.md). It owns USB-C charging,
   1S pack protection/gauging, power switching, and the 5V/3A rail.
 - **Mechanical envelope:** see [`enclosure-spec.md`](enclosure-spec.md);
-  the 356 × 80 mm keyboard and under-mounted 120 × 90 mm control board fit the
+  the 356 × 80 mm keyboard and under-mounted 130 × 100 mm control board fit the
   400 × 170 mm panel, with a ~32 mm internal stack. `verify_fit.py` checks this.
 - **EMD package:** the current combined project imports the control and
   keyboard netlists/PCBs, aligns the control board under the keyboard, validates

@@ -9,7 +9,7 @@ compatible.
 
 - Faceplate/panel: **400 × 170 mm**.
 - Keyboard board: **356 × 80 mm**, placed at panel **(0.9, 86)**.
-- Control board: **120 × 90 mm**, mounted under the keyboard/top-control area
+- Control board: **130 × 100 mm**, mounted under the keyboard/top-control area
   at panel **(140, 65)** on 10 mm standoffs.
 - The top 86 mm strip carries the screen, soft keys, encoders, pots, slider,
   joystick, transport, and function keys; the keyboard/step rows sit below it.
