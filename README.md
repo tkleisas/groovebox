@@ -19,7 +19,7 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
 | Concept | full-size panel, 400 × 150 mm | compact, 180 × 210 mm faceplate PCB |
 | Keys | 55 MX keys (piano + 16-step row + function) | 45 Choc keys (4×8 grid) + 13 function |
 | Control | 8 encoders, 2 pots, data slider, thumbstick | 4 encoders, thumbstick, crossfader |
-| Status | rev B2 schematics + ERC 0 errors; outlines updated, layout pending | schematic-complete, **0 ERC errors**, footprints assigned |
+| Status | rev B2 schematics + ERC 0 errors; both boards placed, routing pending | schematic-complete, **0 ERC errors**, footprints assigned |
 | Docs | [`docs/design.md`](docs/design.md) + [`hardware/README.md`](hardware/README.md) | [`docs/nsr2-design.md`](docs/nsr2-design.md) + [`nsr2/README.md`](nsr2/README.md) |
 
 ## What it does (emulator, today)

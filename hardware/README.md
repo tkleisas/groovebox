@@ -12,6 +12,9 @@ regenerate.
 ```bash
 python3 hardware/tools/gen_schematics.py
 python3 hardware/tools/verify_schematics.py
+# In the KiCad 10 container:
+python3 hardware/tools/place_control.py
+python3 hardware/tools/place_keyboard.py
 ```
 
 `gen_schematics.py` uses the KiCad 10 symbol definitions embedded in the
@@ -63,5 +66,9 @@ Current result: **0 ERC errors** for both boards. Expected warnings:
   `hardware/tools/place_control.py`; DRC reports 0 violations (156 unrouted
   ratsnest connections remain). The board grew to 120 × 90 mm to clear the
   eight encoder headers.
-- **Not yet done:** control routing, keyboard placement/routing, fabrication
-  outputs, and final DRC on routed boards.
+- **Keyboard placement:** all 45 switches, 32 LEDs, 32 resistors, 3 key
+  expanders, HT16K33, link, and decoupling placed with
+  `hardware/tools/place_keyboard.py`; DRC reports 0 violations (222 unrouted
+  ratsnest connections remain).
+- **Not yet done:** routing both boards, fabrication outputs, and final DRC on
+  the routed boards.
