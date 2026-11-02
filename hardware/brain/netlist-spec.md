@@ -1,6 +1,6 @@
 # NSR-1 brain carrier — Raspberry Pi Zero 2W rev A
 
-Status: **rev A schematic generated.** This is the first SBC-specific carrier. It is not
+Status: **rev A schematic and layout.** This is the first SBC-specific carrier. It is not
 a universal brain board. A Radxa Zero 3W or Orange Pi Zero 3W carrier is a
 separate PCB with its own spec and validation.
 

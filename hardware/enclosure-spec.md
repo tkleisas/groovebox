@@ -63,8 +63,8 @@ battery ~12 mm, so each fits within the 35 mm external-height envelope.
 ### Power-board bay
 
 - Separate 4× M3 insert pattern for the power/battery board.
-- Board: 90 × 60 mm, with connector access from the rear or bottom service
-  hatch.
+- Board: 100 × 70 mm, 4-layer, with connector access from the rear or bottom
+  service hatch.
 - USB-C charge port, power button, and charge-status light pipe must be
   reachable with the enclosure closed.
 - The power board must not sit directly under the SBC heat source.

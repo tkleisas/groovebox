@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""Generate KiCad schematics for the NSR-1 control, keyboard, and brain boards.
+"""Generate KiCad schematics for the NSR-1 platform boards.
 
-The NSR-2 generator already provides the KiCad 10 schematic writer and
-embedded symbol reader.  This generator reuses those helpers and pulls the
-symbol definitions from the checked-in NSR-2 schematics so it does not depend
-on a local KiCad installation.
+Control, keyboard, and brain use symbols embedded in the checked-in NSR-2
+schematics. The power board also needs KICAD_SYMBOL_DIR pointed at the
+installed KiCad symbol libraries.
 
-Usage:  python hardware/tools/gen_schematics.py
+Usage:  python hardware/tools/gen_schematics.py [control] [keyboard] [brain] [power]
 Writes: hardware/control/control.kicad_sch
         hardware/keyboard/keyboard.kicad_sch
         hardware/brain/brain.kicad_sch
+        hardware/power/power.kicad_sch
 """
 from __future__ import annotations
 
 import datetime as _dt
 import importlib.util
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +72,22 @@ class EmbeddedSymLib(kicad.SymLib):
         if lib_id in self.cache:
             return self.cache[lib_id]
         raise KeyError(f"symbol '{lib_id}' is not in the NSR-2 symbol set")
+
+
+class FallbackSymLib(EmbeddedSymLib):
+    """Embedded NSR-2 symbols first, installed KiCad libraries second."""
+
+    def __init__(self, paths, libdir=None):
+        super().__init__(paths)
+        self.fallback = kicad.SymLib(libdir) if libdir else None
+
+    def get(self, lib_id):
+        try:
+            return super().get(lib_id)
+        except KeyError:
+            if self.fallback is None:
+                raise
+            return self.fallback.get(lib_id)
 
 
 def _save(board, path, date, rev="B2"):
@@ -377,15 +395,156 @@ def brain(lib, date):
     _save(b, OUT_DIR / "brain" / "brain.kicad_sch", date, rev="A")
 
 
+def power(lib, date):
+    b = Nsr1Board(lib, "power", "NSR-1 power/battery board (rev A)")
+    b.text("NSR-1 POWER BOARD - USB-C, 1S charger, 5V boost, gauge", 25, 25, 3.0)
+
+    b.place("Connector:USB_C_Receptacle_USB2.0_16P", "J", "USB_C_CHARGE",
+            35, 55, "Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal",
+            "USB-C charge input, 5V sink",
+            pin_nets={
+                "A1": "@GND", "A4": "VBUS", "A5": "CC1", "A6": "@NC",
+                "A7": "@NC", "A8": "@NC", "A9": "VBUS", "A12": "@GND",
+                "B1": "@GND", "B4": "VBUS", "B5": "CC2", "B6": "@NC",
+                "B7": "@NC", "B8": "@NC", "B9": "VBUS", "B12": "@GND",
+                "SH": "@GND"})
+    b.place("Device:R", "R", "5k1", 85, 55,
+            "Resistor_SMD:R_0805_2012Metric", "USB-C CC1 sink",
+            {1: "CC1", 2: "@GND"})
+    b.place("Device:R", "R", "5k1", 85, 75,
+            "Resistor_SMD:R_0805_2012Metric", "USB-C CC2 sink",
+            {1: "CC2", 2: "@GND"})
+
+    b.place("Device:Fuse", "F", "2A", 130, 45,
+            "Fuse:Fuse_1206_3216Metric", "charge input fuse",
+            {1: "VBUS", 2: "VIN"})
+    b.place("Device:D_TVS", "D", "SMBJ5.0A", 155, 45,
+            "Diode_SMD:D_SMB", "VBUS transient clamp",
+            {1: "VIN", 2: "@GND"})
+
+    b.place("Battery_Management:BQ24074RGT", "U", "BQ24074RGT", 135, 90,
+            "Package_DFN_QFN:VQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm",
+            "1S charger with power path",
+            pin_nets={
+                1: "TS", 2: "BAT+", 3: "BAT+", 4: "@GND", 5: "@GND",
+                6: "VIN", 7: "@NC", 8: "@GND", 9: "CHG", 10: "SYS",
+                11: "SYS", 12: "ILIM", 13: "VIN", 14: "TMR",
+                15: "ITERM", 16: "ISET", 17: "@GND"})
+    for ref, value, net, x in (
+            ("R_ILIM", "1k5", "ILIM", 215), ("R_ISET", "1k5", "ISET", 240),
+            ("R_ITERM", "10k", "ITERM", 265), ("R_TS", "10k", "TS", 290)):
+        b.place("Device:R", "R", value, x, 80,
+                "Resistor_SMD:R_0805_2012Metric", "BQ24074 setting",
+                {1: net, 2: "@GND"})
+    b.place("Device:C", "C", "100n", 215, 110,
+            "Capacitor_SMD:C_0805_2012Metric", "BQ24074 timer",
+            {1: "TMR", 2: "@GND"})
+
+    b.place("Regulator_Switching:TPS61089", "U", "TPS61089", 135, 150,
+            "Package_DFN_QFN:Texas_VQFN-RNR0011A-11", "5V/3A boost",
+            pin_nets={1: "FSW", 2: "VCC", 3: "FB", 4: "COMP", 5: "@GND",
+                      6: "@+5V", 7: "PWR_SW", 8: "B_ILIM", 9: "SYS",
+                      10: "BOOT", 11: "SW"})
+    b.place("Device:L", "L", "2u2", 185, 150,
+            "Inductor_SMD:L_Coilcraft_XAL7030-222", "boost inductor",
+            {1: "SYS", 2: "SW"})
+    for ref, value, net, x in (
+            ("R_FSW", "100k", "FSW", 215), ("R_BILIM", "100k", "B_ILIM", 240),
+            ("R_FB1", "1M", "+5V", 265), ("R_FB2", "200k", "FB", 290)):
+        b.place("Device:R", "R", value, x, 150,
+                "Resistor_SMD:R_0805_2012Metric", "TPS61089 setting",
+                {1: net, 2: "FB" if ref == "R_FB1" else "@GND"})
+    b.place("Device:R", "R", "100k", 215, 175,
+            "Resistor_SMD:R_0805_2012Metric", "boost EN pulldown",
+            {1: "PWR_SW", 2: "@GND"})
+    b.place("Device:R", "R", "10k", 240, 175,
+            "Resistor_SMD:R_0805_2012Metric", "boost comp R",
+            {1: "COMP", 2: "COMP_RC"})
+    b.place("Device:C", "C", "10n", 265, 175,
+            "Capacitor_SMD:C_0805_2012Metric", "boost comp C",
+            {1: "COMP_RC", 2: "@GND"})
+    b.place("Device:C", "C", "1u", 290, 175,
+            "Capacitor_SMD:C_1206_3216Metric", "boost VCC",
+            {1: "VCC", 2: "@GND"})
+    b.place("Device:C", "C", "100n", 315, 175,
+            "Capacitor_SMD:C_0805_2012Metric", "boost boot",
+            {1: "BOOT", 2: "SW"})
+
+    b.place("Battery_Management:BQ27441-G1", "U", "BQ27441-G1", 180, 220,
+            "Package_SON:Texas_S-PDSO-N12", "1S fuel gauge",
+            pin_nets={1: "SDA", 2: "SCL", 3: "@GND", 4: "@NC", 5: "@+3V3",
+                      6: "BAT+", 7: "@GND", 8: "BAT_NEG", 9: "@NC",
+                      10: "@NC", 11: "@NC", 12: "LOW_BATT", 13: "@GND"})
+    b.place("Device:R", "R", "10m", 240, 220,
+            "Resistor_SMD:R_2512_6332Metric", "battery sense",
+            {1: "BAT_NEG", 2: "@GND"})
+    b.place("Device:R", "R", "4k7", 265, 220,
+            "Resistor_SMD:R_0805_2012Metric", "I2C SDA pull-up",
+            {1: "@+3V3", 2: "SDA"})
+    b.place("Device:R", "R", "4k7", 290, 220,
+            "Resistor_SMD:R_0805_2012Metric", "I2C SCL pull-up",
+            {1: "@+3V3", 2: "SCL"})
+
+    b.place("Switch:SW_SPDT", "SW", "POWER", 65, 150,
+            "Button_Switch_THT:SW_Slide_SPDT_Straight_CK_OS102011MS2Q",
+            "power switch", pin_nets={1: "SYS", 2: "PWR_SW"}, nc_pins=[3])
+
+    b.place("Device:LED", "D", "red", 330, 90,
+            "LED_SMD:LED_0805_2012Metric", "charge LED",
+            pin_names={"A": "CHG_LED_A", "K": "CHG"})
+    b.place("Device:R", "R", "1k", 330, 70,
+            "Resistor_SMD:R_0805_2012Metric", "charge LED series",
+            {1: "VBUS", 2: "CHG_LED_A"})
+    b.place("Device:LED", "D", "green", 330, 130,
+            "LED_SMD:LED_0805_2012Metric", "power LED",
+            pin_names={"A": "@+5V", "K": "PWR_LED_K"})
+    b.place("Device:R", "R", "1k", 330, 150,
+            "Resistor_SMD:R_0805_2012Metric", "power LED series",
+            {1: "PWR_LED_K", 2: "@GND"})
+
+    b.place("Connector_Generic:Conn_01x02", "J", "BATTERY", 35, 220,
+            "Connector_AMASS:AMASS_XT30UPB-F_1x02_P5.0mm_Vertical",
+            "1S battery input", {1: "BAT+", 2: "BAT_NEG"})
+    b.place("Connector_Generic:Conn_01x02", "J", "NTC", 75, 220,
+            "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
+            "battery NTC", {1: "TS", 2: "@GND"})
+    b.place("Connector_Generic:Conn_01x02", "J", "5V_OUT", 115, 220,
+            "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
+            "5V output to brain", {1: "@+5V", 2: "@GND"})
+    b.place("Connector_Generic:Conn_01x02", "J", "LOW_BATT", 155, 220,
+            "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
+            "low-battery signal", {1: "LOW_BATT", 2: "@GND"})
+    b.place("Connector_Generic:Conn_01x04", "J", "GAUGE_I2C", 235, 260,
+            "Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical",
+            "gauge I2C to brain",
+            {1: "@+3V3", 2: "@GND", 3: "SDA", 4: "SCL"})
+
+    for i, (value, net, x) in enumerate((
+            ("10u", "VIN", 35), ("10u", "SYS", 65), ("22u", "@+5V", 95),
+            ("100n", "VIN", 125), ("100n", "SYS", 155), ("100n", "@+5V", 185))):
+        b.place("Device:C", "C", value, x, 260,
+                "Capacitor_SMD:C_1206_3216Metric" if value in ("10u", "22u")
+                else "Capacitor_SMD:C_0805_2012Metric", "bulk/decoupling",
+                {1: net, 2: "@GND"})
+    b.power_flags(("VIN", "GND"), 25, 340)
+    _save(b, OUT_DIR / "power" / "power.kicad_sch", date, rev="A")
+
+
 def main():
     today = _dt.date.today().isoformat()
-    lib = EmbeddedSymLib([
+    targets = sys.argv[1:] or ["control", "keyboard", "brain", "power"]
+    lib = FallbackSymLib([
         ROOT / "nsr2" / "hardware" / "brain" / "brain.kicad_sch",
         ROOT / "nsr2" / "hardware" / "io" / "io.kicad_sch",
-    ])
-    control(lib, today)
-    keyboard(lib, today)
-    brain(lib, today)
+    ], os.environ.get("KICAD_SYMBOL_DIR"))
+    if "control" in targets:
+        control(lib, today)
+    if "keyboard" in targets:
+        keyboard(lib, today)
+    if "brain" in targets:
+        brain(lib, today)
+    if "power" in targets:
+        power(lib, today)
 
 
 if __name__ == "__main__":

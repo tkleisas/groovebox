@@ -14,7 +14,7 @@ SBC-specific carrier; Radxa/Orange Pi carriers are separate boards.
 ## Checks
 
 ```bash
-python3 hardware/tools/gen_schematics.py
+python3 hardware/tools/gen_schematics.py brain
 python3 hardware/tools/export_netlist.py --board brain
 cd hardware/brain
 kicad-cli sch erc brain.kicad_sch --output /tmp/brain-erc.json --format json --severity-all
@@ -23,6 +23,6 @@ emd import kicad brain.net.xml --out /tmp/brain.json
 emd validate /tmp/brain.json
 ```
 
-Current status: schematic generated, 0 ERC errors, expected
-`lib_symbol_mismatch` warnings only; netlist validates in EMD; PCB outline
-110 × 90 mm with 4× M3 holes; placement not started.
+Current status: schematic generated, 0 ERC errors (expected
+`lib_symbol_mismatch` warnings only); netlist validates in EMD; PCB
+110 × 90 mm, routed, 0 unconnected, 4× M3 holes.

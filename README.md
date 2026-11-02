@@ -30,7 +30,7 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
 | Concept | full-size panel, 400 × 170 mm | compact, 180 × 210 mm faceplate PCB |
 | Keys | 55 MX keys (piano + 16-step row + function) | 45 Choc keys (4×8 grid) + 13 function |
 | Control | 8 encoders, 2 pots, data slider, thumbstick | 4 encoders, thumbstick, crossfader |
-| Status | **active target.** rev B2 control/keyboard routed and verified; Pi brain carrier schematic complete; power board next | **deferred.** schematic-complete reference design; not the current build |
+| Status | **active target.** rev B2 control/keyboard verified; Pi brain carrier routed; power board routed except two BAT_NEG airwires | **deferred.** schematic-complete reference design; not the current build |
 | Docs | [`docs/design.md`](docs/design.md) + [`hardware/README.md`](hardware/README.md) | [`docs/nsr2-design.md`](docs/nsr2-design.md) + [`nsr2/README.md`](nsr2/README.md) |
 
 ## What it does (emulator, today)
@@ -77,6 +77,19 @@ New platform board specs: [Pi Zero 2W brain carrier](hardware/brain/netlist-spec
 and [power/battery board](hardware/power/netlist-spec.md).
 Panel/brain protocol (USB-MIDI + SysEx config):
 [docs/panel-protocol.md](docs/panel-protocol.md).
+
+### NSR-1 PCB views
+
+Bare-board 3D renders, top and bottom, for all four NSR-1 boards. The Pi
+carrier and power board are rev A; the power board still has two `BAT_NEG`
+airwires. Full-size images are in [`docs/renders/pcb/`](docs/renders/pcb/).
+
+| Board | Top | Bottom |
+|---|---|---|
+| Control | <a href="docs/renders/pcb/control_top.png"><img src="docs/renders/pcb/control_top.png" width="380"></a> | <a href="docs/renders/pcb/control_bottom.png"><img src="docs/renders/pcb/control_bottom.png" width="380"></a> |
+| Keyboard | <a href="docs/renders/pcb/keyboard_top.png"><img src="docs/renders/pcb/keyboard_top.png" width="380"></a> | <a href="docs/renders/pcb/keyboard_bottom.png"><img src="docs/renders/pcb/keyboard_bottom.png" width="380"></a> |
+| Pi brain carrier | <a href="docs/renders/pcb/brain_top.png"><img src="docs/renders/pcb/brain_top.png" width="380"></a> | <a href="docs/renders/pcb/brain_bottom.png"><img src="docs/renders/pcb/brain_bottom.png" width="380"></a> |
+| Power/battery | <a href="docs/renders/pcb/power_top.png"><img src="docs/renders/pcb/power_top.png" width="380"></a> | <a href="docs/renders/pcb/power_bottom.png"><img src="docs/renders/pcb/power_bottom.png" width="380"></a> |
 
 ## ElectroMechanicalDesigner integration
 

@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from gen_schematics import EmbeddedSymLib  # noqa: E402
+from gen_schematics import EmbeddedSymLib, FallbackSymLib  # noqa: E402
 import gen_schematics as g  # noqa: E402
 
 POWER = {"GND", "+3V3", "+5V"}

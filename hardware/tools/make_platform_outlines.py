@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MOUNT_LIB = "/usr/share/kicad/footprints/MountingHole.pretty"
 BOARDS = (
     ("brain", 110, 90, "NSR-1 BRAIN CARRIER - Pi Zero 2W - 110x90mm - M3"),
-    ("power", 90, 60, "NSR-1 POWER BOARD - 1S 5000mAh - 90x60mm - M3"),
+    ("power", 100, 70, "NSR-1 POWER BOARD - 1S 5000mAh - 100x70mm - M3"),
 )
 
 
@@ -65,7 +65,6 @@ def make_board(name, width, height, title):
                             ((5, 5), (width - 5, 5),
                              (5, height - 5), (width - 5, height - 5))):
         mounting_hole(board, ref, x, y)
-    board_text(board, title, width / 2, height / 2)
     out = ROOT / "hardware" / name / f"{name}.kicad_pcb"
     pcbnew.SaveBoard(str(out), board)
     print("wrote", out)

@@ -1,7 +1,7 @@
 # NSR-1 power/battery board — rev A
 
-Status: **rev A specification and outline.** This board is common to the NSR-1
-platform and to future SBC carriers. It is deliberately separate from the brain carrier.
+Status: **rev A schematic and layout.** This board is common to the NSR-1
+platform and to future SBC carriers; two BAT_NEG links remain as airwires. It is deliberately separate from the brain carrier.
 
 Source of truth for this board. Platform policy is in
 [`../../docs/mission.md`](../../docs/mission.md).
@@ -42,9 +42,9 @@ and the 5V output.
 
 ## Board outline and mounting
 
-- Board: **90 × 60 mm**, 2-layer, 2 oz copper on the 5V/battery paths,
-  1.6 mm, green soldermask.
-- M3 mounting holes (3.2 mm) at `(5,5)`, `(85,5)`, `(5,55)`, `(85,55)`.
+- Board: **100 × 70 mm**, 4-layer, 1.6 mm, green soldermask, 2 oz copper on
+  the outer-layer 5V/battery paths.
+- M3 mounting holes (3.2 mm) at `(5,5)`, `(95,5)`, `(5,65)`, `(95,65)`.
 - The board fits the NSR-1 power-board bay on four M3 inserts.
 - USB-C, power switch, and status LEDs must align with the rear panel or a
   light pipe. Keep the battery and its wiring away from the boost/charger
@@ -84,8 +84,8 @@ thermal performance before layout.
 | Ref | Candidate | Role |
 |---|---|---|
 | U1 | BQ24074-class | 1S charger with power path, standalone (no firmware needed) |
-| U2 | TPS61088-class | 5V/3A boost from 1S |
-| U3 | MAX17048-class | 1S fuel gauge, I²C + ALERT |
+| U2 | TPS61089 | 5V/3A boost from 1S |
+| U3 | BQ27441-G1 | 1S fuel gauge, I²C + GPOUT |
 | Q1 | P-channel MOSFET | Reverse-polarity / load path |
 | F1 | resettable fuse or eFuse | Input/output fault protection |
 | D1 | red LED | charging |

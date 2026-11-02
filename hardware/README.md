@@ -10,8 +10,8 @@ The NSR-1 platform has four boards:
 |---|---|---|
 | Keyboard | [`netlist-spec.md`](netlist-spec.md) | routed, 0 DRC, EMD-verified |
 | Control | [`netlist-spec.md`](netlist-spec.md) | routed, 0 DRC, EMD-verified |
-| Brain carrier (Pi Zero 2W) | [`brain/netlist-spec.md`](brain/netlist-spec.md) | schematic generated, 0 ERC errors, netlist EMD-valid; outline 110 × 90 |
-| Power/battery | [`power/netlist-spec.md`](power/netlist-spec.md) | rev A spec + 90 × 60 outline; schematic next |
+| Brain carrier (Pi Zero 2W) | [`brain/netlist-spec.md`](brain/netlist-spec.md) | 110 × 90, routed, 0 unconnected, 4× M3 |
+| Power/battery | [`power/netlist-spec.md`](power/netlist-spec.md) | 100 × 70, 4-layer, routed except 2 BAT_NEG links |
 
 The control and keyboard boards are the existing rev B2 design. The brain
 carrier and power board are new platform boards; their specs are the source of
@@ -33,7 +33,7 @@ The control and keyboard schematics are generated. Do not hand-edit the
 regenerate.
 
 ```bash
-python3 hardware/tools/gen_schematics.py
+python3 hardware/tools/gen_schematics.py control keyboard brain
 python3 hardware/tools/verify_schematics.py
 # In the KiCad 10 container:
 python3 hardware/tools/place_control.py
@@ -46,7 +46,9 @@ python3 hardware/tools/make_platform_outlines.py
 ```
 
 `gen_schematics.py` uses the KiCad 10 symbol definitions embedded in the
-checked-in NSR-2 schematics, so it does not need a local KiCad installation.
+checked-in NSR-2 schematics for control/keyboard/brain. The power board also
+needs the installed KiCad symbol libraries, so generate it inside the KiCad
+container with `-e KICAD_SYMBOL_DIR=/usr/share/kicad/symbols`.
 `verify_schematics.py` checks pin coverage, key/encoder/analog nets, I²C
 endpoints, address straps, LED ROW/COM grouping, and power endpoints.
 
@@ -54,6 +56,10 @@ Export netlists and validate them with EMD:
 
 ```bash
 python3 hardware/tools/export_netlist.py
+# power netlist needs the KiCad symbol directory:
+docker run --rm -v "$PWD:/work" -w /work \
+  -e KICAD_SYMBOL_DIR=/usr/share/kicad/symbols kicad/kicad:10.0 \
+  python3 hardware/tools/export_netlist.py --board power
 python3 hardware/tools/verify_emd.py --emd /path/to/emd
 python3 hardware/tools/verify_emd.py --package-dir hardware/emd-packages \
   --combined hardware/emd-packages/groovebox.json
@@ -74,9 +80,9 @@ CC-BY-SA 4.0) and is assigned to all 45 switch symbols.
 The brain carrier is the first SBC-specific board. It is a Raspberry Pi Zero
 2W carrier by design; Radxa Zero 3W and Orange Pi Zero 3W would each get a
 separate carrier and validation effort. The power board is common to all
-carriers. Brain carrier: 110 × 90 mm outline, generated schematic, EMD-valid
-netlist, layout not started. Power board: 90 × 60 mm outline, spec complete,
-schematic next. Start from their netlist specs.
+carriers. Brain carrier: 110 × 90 mm, routed, 0 unconnected, EMD-valid
+netlist. Power board: 100 × 70 mm, 4-layer, routed except two BAT_NEG links
+that remain as rev A airwires. Start from their netlist specs.
 
 ## KiCad checks
 
@@ -88,10 +94,10 @@ docker run --rm -v "$PWD:/work" -w /work kicad/kicad:10.0 \
   --output /work/control-erc.json --format json --severity-all
 ```
 
-Current result: **0 ERC errors** for control, keyboard, and brain. Expected
-warnings are `lib_symbol_mismatch` from the embedded symbol copies (cosmetic).
-Routed control/keyboard DRC is clean (0 violations, 0 unconnected items);
-brain and power outlines are DRC-clean with no placement yet.
+Current result: **0 ERC errors** for control, keyboard, brain, and power.
+Expected warnings are `lib_symbol_mismatch` from the embedded symbol copies
+(cosmetic). Routed control/keyboard/brain DRC is clean with 0 unconnected
+items; the power board is routed except two `BAT_NEG` airwires.
 
 Generate Gerbers, drill files, position CSV, BOM, STEP, stats, and zip
 archives with:
@@ -122,16 +128,17 @@ model because the KiCad container does not ship the 3D model library. Set
   `hardware/tools/place_keyboard.py`, then routed with Freerouting; DRC
   reports 0 violations and 0 unconnected items. Four M3 mounting-hole
   footprints are present for EMD mechanical ports.
-- **Ground pour:** both boards have a filled B.Cu GND zone; both boards use solid pad connections on the B.Cu GND pour.
-- **Brain carrier:** Raspberry Pi Zero 2W carrier rev A schematic generated
-  with 0 ERC errors (expected `lib_symbol_mismatch` warnings only); netlist
-  validates in EMD; board outline is 110 × 90 mm with 4× M3 holes. See
-  [`brain/netlist-spec.md`](brain/netlist-spec.md). It owns the Pi socket,
+- **Ground pour:** control, keyboard, brain, and power boards have a filled
+  B.Cu GND zone.
+- **Brain carrier:** Raspberry Pi Zero 2W carrier rev A is 110 × 90 mm,
+  routed with 0 unconnected items, 0 ERC errors, and an EMD-valid netlist.
+  See [`brain/netlist-spec.md`](brain/netlist-spec.md). It owns the Pi socket,
   Audio Injector Zero stack, display header, DIN MIDI, panel USB breakout, and
   5V input. It deliberately does not contain the battery charger or boost.
-- **Power/battery board:** rev A spec and 90 × 60 mm outline; schematic is
-  next. See [`power/netlist-spec.md`](power/netlist-spec.md). It owns USB-C
-  charging, 1S pack protection/gauging, power switching, and the 5V/3A rail.
+- **Power/battery board:** 100 × 70 mm, 4-layer, schematic generated and
+  routed except two BAT_NEG links (rev A airwires); see
+  [`power/netlist-spec.md`](power/netlist-spec.md). It owns USB-C charging,
+  1S pack protection/gauging, power switching, and the 5V/3A rail.
 - **Mechanical envelope:** see [`enclosure-spec.md`](enclosure-spec.md);
   the 356 × 80 mm keyboard and under-mounted 120 × 90 mm control board fit the
   400 × 170 mm panel, with a ~32 mm internal stack. `verify_fit.py` checks this.

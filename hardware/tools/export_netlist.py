@@ -7,16 +7,18 @@ netlist without requiring a KiCad CLI installation.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from verify_schematics import EmbeddedSymLib, ROOT, collect_pins
+from verify_schematics import FallbackSymLib, ROOT, collect_pins
 
 
 BOARDS = {
     "control": ROOT / "hardware" / "control" / "control.kicad_sch",
     "keyboard": ROOT / "hardware" / "keyboard" / "keyboard.kicad_sch",
     "brain": ROOT / "hardware" / "brain" / "brain.kicad_sch",
+    "power": ROOT / "hardware" / "power" / "power.kicad_sch",
 }
 
 
@@ -65,14 +67,19 @@ def export(board, path, lib, output):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--board", choices=["control", "keyboard", "brain", "all"], default="all")
+    parser.add_argument("--board", choices=["control", "keyboard", "brain", "power", "all"], default="all")
     parser.add_argument("--out-dir", default=str(ROOT / "hardware"))
     args = parser.parse_args()
-    lib = EmbeddedSymLib([
+    lib = FallbackSymLib([
         ROOT / "nsr2" / "hardware" / "brain" / "brain.kicad_sch",
         ROOT / "nsr2" / "hardware" / "io" / "io.kicad_sch",
-    ])
+    ], os.environ.get("KICAD_SYMBOL_DIR"))
     boards = BOARDS if args.board == "all" else {args.board: BOARDS[args.board]}
+    if "power" in boards and not os.environ.get("KICAD_SYMBOL_DIR"):
+        if args.board == "power":
+            raise SystemExit("power export needs KICAD_SYMBOL_DIR=/usr/share/kicad/symbols")
+        boards = {name: path for name, path in boards.items() if name != "power"}
+        print("skipping power (set KICAD_SYMBOL_DIR to export it)")
     out_dir = Path(args.out_dir)
     for board, path in boards.items():
         export(board, path, lib, out_dir / board / f"{board}.net.xml")

@@ -1,0 +1,407 @@
+<?xml version='1.0' encoding='utf-8'?>
+<export version="E">
+  <design>
+    <source>power.kicad_sch</source>
+    <date>2026-11-02</date>
+    <tool>EMD NSR-1 generator</tool>
+  </design>
+  <components>
+    <comp ref="C1">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C10">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C2">
+      <value>10n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C3">
+      <value>1u</value>
+      <footprint>Capacitor_SMD:C_1206_3216Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C4">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C5">
+      <value>10u</value>
+      <footprint>Capacitor_SMD:C_1206_3216Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C6">
+      <value>10u</value>
+      <footprint>Capacitor_SMD:C_1206_3216Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C7">
+      <value>22u</value>
+      <footprint>Capacitor_SMD:C_1206_3216Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C8">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="C9">
+      <value>100n</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <libsource lib="Device" part="C" />
+    </comp>
+    <comp ref="D1">
+      <value>SMBJ5.0A</value>
+      <footprint>Diode_SMD:D_SMB</footprint>
+      <libsource lib="Device" part="D_TVS" />
+    </comp>
+    <comp ref="D2">
+      <value>red</value>
+      <footprint>LED_SMD:LED_0805_2012Metric</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="D3">
+      <value>green</value>
+      <footprint>LED_SMD:LED_0805_2012Metric</footprint>
+      <libsource lib="Device" part="LED" />
+    </comp>
+    <comp ref="F1">
+      <value>2A</value>
+      <footprint>Fuse:Fuse_1206_3216Metric</footprint>
+      <libsource lib="Device" part="Fuse" />
+    </comp>
+    <comp ref="J1">
+      <value>USB_C_CHARGE</value>
+      <footprint>Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal</footprint>
+      <libsource lib="Connector" part="USB_C_Receptacle_USB2.0_16P" />
+    </comp>
+    <comp ref="J2">
+      <value>BATTERY</value>
+      <footprint>Connector_AMASS:AMASS_XT30UPB-F_1x02_P5.0mm_Vertical</footprint>
+      <libsource lib="Connector_Generic" part="Conn_01x02" />
+    </comp>
+    <comp ref="J3">
+      <value>NTC</value>
+      <footprint>Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical</footprint>
+      <libsource lib="Connector_Generic" part="Conn_01x02" />
+    </comp>
+    <comp ref="J4">
+      <value>5V_OUT</value>
+      <footprint>Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical</footprint>
+      <libsource lib="Connector_Generic" part="Conn_01x02" />
+    </comp>
+    <comp ref="J5">
+      <value>LOW_BATT</value>
+      <footprint>Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical</footprint>
+      <libsource lib="Connector_Generic" part="Conn_01x02" />
+    </comp>
+    <comp ref="J6">
+      <value>GAUGE_I2C</value>
+      <footprint>Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical</footprint>
+      <libsource lib="Connector_Generic" part="Conn_01x04" />
+    </comp>
+    <comp ref="L1">
+      <value>2u2</value>
+      <footprint>Inductor_SMD:L_Coilcraft_XAL7030-222</footprint>
+      <libsource lib="Device" part="L" />
+    </comp>
+    <comp ref="R1">
+      <value>5k1</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R10">
+      <value>200k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R11">
+      <value>100k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R12">
+      <value>10k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R13">
+      <value>10m</value>
+      <footprint>Resistor_SMD:R_2512_6332Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R14">
+      <value>4k7</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R15">
+      <value>4k7</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R16">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R17">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R2">
+      <value>5k1</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R3">
+      <value>1k5</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R4">
+      <value>1k5</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R5">
+      <value>10k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R6">
+      <value>10k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R7">
+      <value>100k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R8">
+      <value>100k</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="R9">
+      <value>1M</value>
+      <footprint>Resistor_SMD:R_0805_2012Metric</footprint>
+      <libsource lib="Device" part="R" />
+    </comp>
+    <comp ref="SW1">
+      <value>POWER</value>
+      <footprint>Button_Switch_THT:SW_Slide_SPDT_Straight_CK_OS102011MS2Q</footprint>
+      <libsource lib="Switch" part="SW_SPDT" />
+    </comp>
+    <comp ref="U1">
+      <value>BQ24074RGT</value>
+      <footprint>Package_DFN_QFN:VQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm</footprint>
+      <libsource lib="Battery_Management" part="BQ24074RGT" />
+    </comp>
+    <comp ref="U2">
+      <value>TPS61089</value>
+      <footprint>Package_DFN_QFN:Texas_VQFN-RNR0011A-11</footprint>
+      <libsource lib="Regulator_Switching" part="TPS61089" />
+    </comp>
+    <comp ref="U3">
+      <value>BQ27441-G1</value>
+      <footprint>Package_SON:Texas_S-PDSO-N12</footprint>
+      <libsource lib="Battery_Management" part="BQ27441-G1" />
+    </comp>
+  </components>
+  <nets>
+    <net code="1" name="+3V3">
+      <node ref="J6" pin="1" pinfunction="Pin_1" />
+      <node ref="R14" pin="1" pinfunction="" />
+      <node ref="R15" pin="1" pinfunction="" />
+      <node ref="U3" pin="5" pinfunction="V_{DD}" />
+    </net>
+    <net code="2" name="+5V">
+      <node ref="C10" pin="1" pinfunction="" />
+      <node ref="C7" pin="1" pinfunction="" />
+      <node ref="D3" pin="2" pinfunction="A" />
+      <node ref="J4" pin="1" pinfunction="Pin_1" />
+      <node ref="R9" pin="1" pinfunction="" />
+      <node ref="U2" pin="6" pinfunction="VOUT" />
+    </net>
+    <net code="3" name="BAT+">
+      <node ref="J2" pin="1" pinfunction="Pin_1" />
+      <node ref="U1" pin="2" pinfunction="BAT" />
+      <node ref="U1" pin="3" pinfunction="BAT" />
+      <node ref="U3" pin="6" pinfunction="BAT" />
+    </net>
+    <net code="4" name="BAT_NEG">
+      <node ref="J2" pin="2" pinfunction="Pin_2" />
+      <node ref="R13" pin="1" pinfunction="" />
+      <node ref="U3" pin="8" pinfunction="SRP" />
+    </net>
+    <net code="5" name="BOOT">
+      <node ref="C4" pin="1" pinfunction="" />
+      <node ref="U2" pin="10" pinfunction="BOOT" />
+    </net>
+    <net code="6" name="B_ILIM">
+      <node ref="R8" pin="1" pinfunction="" />
+      <node ref="U2" pin="8" pinfunction="ILIM" />
+    </net>
+    <net code="7" name="CC1">
+      <node ref="J1" pin="A5" pinfunction="CC1" />
+      <node ref="R1" pin="1" pinfunction="" />
+    </net>
+    <net code="8" name="CC2">
+      <node ref="J1" pin="B5" pinfunction="CC2" />
+      <node ref="R2" pin="1" pinfunction="" />
+    </net>
+    <net code="9" name="CHG">
+      <node ref="D2" pin="1" pinfunction="K" />
+      <node ref="U1" pin="9" pinfunction="~{CHG}" />
+    </net>
+    <net code="10" name="CHG_LED_A">
+      <node ref="D2" pin="2" pinfunction="A" />
+      <node ref="R16" pin="2" pinfunction="" />
+    </net>
+    <net code="11" name="COMP">
+      <node ref="R12" pin="1" pinfunction="" />
+      <node ref="U2" pin="4" pinfunction="COMP" />
+    </net>
+    <net code="12" name="COMP_RC">
+      <node ref="C2" pin="1" pinfunction="" />
+      <node ref="R12" pin="2" pinfunction="" />
+    </net>
+    <net code="13" name="FB">
+      <node ref="R10" pin="1" pinfunction="" />
+      <node ref="R9" pin="2" pinfunction="" />
+      <node ref="U2" pin="3" pinfunction="FB" />
+    </net>
+    <net code="14" name="FSW">
+      <node ref="R7" pin="1" pinfunction="" />
+      <node ref="U2" pin="1" pinfunction="FSW" />
+    </net>
+    <net code="15" name="GND">
+      <node ref="C1" pin="2" pinfunction="" />
+      <node ref="C10" pin="2" pinfunction="" />
+      <node ref="C2" pin="2" pinfunction="" />
+      <node ref="C3" pin="2" pinfunction="" />
+      <node ref="C5" pin="2" pinfunction="" />
+      <node ref="C6" pin="2" pinfunction="" />
+      <node ref="C7" pin="2" pinfunction="" />
+      <node ref="C8" pin="2" pinfunction="" />
+      <node ref="C9" pin="2" pinfunction="" />
+      <node ref="D1" pin="2" pinfunction="A2" />
+      <node ref="J1" pin="A1" pinfunction="GND" />
+      <node ref="J1" pin="A12" pinfunction="GND" />
+      <node ref="J1" pin="B1" pinfunction="GND" />
+      <node ref="J1" pin="B12" pinfunction="GND" />
+      <node ref="J1" pin="SH" pinfunction="SHIELD" />
+      <node ref="J3" pin="2" pinfunction="Pin_2" />
+      <node ref="J4" pin="2" pinfunction="Pin_2" />
+      <node ref="J5" pin="2" pinfunction="Pin_2" />
+      <node ref="J6" pin="2" pinfunction="Pin_2" />
+      <node ref="R1" pin="2" pinfunction="" />
+      <node ref="R10" pin="2" pinfunction="" />
+      <node ref="R11" pin="2" pinfunction="" />
+      <node ref="R13" pin="2" pinfunction="" />
+      <node ref="R17" pin="2" pinfunction="" />
+      <node ref="R2" pin="2" pinfunction="" />
+      <node ref="R3" pin="2" pinfunction="" />
+      <node ref="R4" pin="2" pinfunction="" />
+      <node ref="R5" pin="2" pinfunction="" />
+      <node ref="R6" pin="2" pinfunction="" />
+      <node ref="R7" pin="2" pinfunction="" />
+      <node ref="R8" pin="2" pinfunction="" />
+      <node ref="U1" pin="17" pinfunction="VSS" />
+      <node ref="U1" pin="4" pinfunction="~{CE}" />
+      <node ref="U1" pin="5" pinfunction="EN2" />
+      <node ref="U1" pin="8" pinfunction="VSS" />
+      <node ref="U2" pin="5" pinfunction="GND" />
+      <node ref="U3" pin="13" pinfunction="PAD" />
+      <node ref="U3" pin="3" pinfunction="V_{SS}" />
+      <node ref="U3" pin="7" pinfunction="SRN" />
+    </net>
+    <net code="16" name="ILIM">
+      <node ref="R3" pin="1" pinfunction="" />
+      <node ref="U1" pin="12" pinfunction="ILIM" />
+    </net>
+    <net code="17" name="ISET">
+      <node ref="R4" pin="1" pinfunction="" />
+      <node ref="U1" pin="16" pinfunction="ISET" />
+    </net>
+    <net code="18" name="ITERM">
+      <node ref="R5" pin="1" pinfunction="" />
+      <node ref="U1" pin="15" pinfunction="ITERM" />
+    </net>
+    <net code="19" name="LOW_BATT">
+      <node ref="J5" pin="1" pinfunction="Pin_1" />
+      <node ref="U3" pin="12" pinfunction="GPOUT" />
+    </net>
+    <net code="20" name="PWR_LED_K">
+      <node ref="D3" pin="1" pinfunction="K" />
+      <node ref="R17" pin="1" pinfunction="" />
+    </net>
+    <net code="21" name="PWR_SW">
+      <node ref="R11" pin="1" pinfunction="" />
+      <node ref="SW1" pin="2" pinfunction="B" />
+      <node ref="U2" pin="7" pinfunction="EN" />
+    </net>
+    <net code="22" name="SCL">
+      <node ref="J6" pin="4" pinfunction="Pin_4" />
+      <node ref="R15" pin="2" pinfunction="" />
+      <node ref="U3" pin="2" pinfunction="SCL" />
+    </net>
+    <net code="23" name="SDA">
+      <node ref="J6" pin="3" pinfunction="Pin_3" />
+      <node ref="R14" pin="2" pinfunction="" />
+      <node ref="U3" pin="1" pinfunction="SDA" />
+    </net>
+    <net code="24" name="SW">
+      <node ref="C4" pin="2" pinfunction="" />
+      <node ref="L1" pin="2" pinfunction="2" />
+      <node ref="U2" pin="11" pinfunction="SW" />
+    </net>
+    <net code="25" name="SYS">
+      <node ref="C6" pin="1" pinfunction="" />
+      <node ref="C9" pin="1" pinfunction="" />
+      <node ref="L1" pin="1" pinfunction="1" />
+      <node ref="SW1" pin="1" pinfunction="A" />
+      <node ref="U1" pin="10" pinfunction="OUT" />
+      <node ref="U1" pin="11" pinfunction="OUT" />
+      <node ref="U2" pin="9" pinfunction="VIN" />
+    </net>
+    <net code="26" name="TMR">
+      <node ref="C1" pin="1" pinfunction="" />
+      <node ref="U1" pin="14" pinfunction="TMR" />
+    </net>
+    <net code="27" name="TS">
+      <node ref="J3" pin="1" pinfunction="Pin_1" />
+      <node ref="R6" pin="1" pinfunction="" />
+      <node ref="U1" pin="1" pinfunction="TS" />
+    </net>
+    <net code="28" name="VBUS">
+      <node ref="F1" pin="1" pinfunction="" />
+      <node ref="J1" pin="A4" pinfunction="VBUS" />
+      <node ref="J1" pin="A9" pinfunction="VBUS" />
+      <node ref="J1" pin="B4" pinfunction="VBUS" />
+      <node ref="J1" pin="B9" pinfunction="VBUS" />
+      <node ref="R16" pin="1" pinfunction="" />
+    </net>
+    <net code="29" name="VCC">
+      <node ref="C3" pin="1" pinfunction="" />
+      <node ref="U2" pin="2" pinfunction="VCC" />
+    </net>
+    <net code="30" name="VIN">
+      <node ref="C5" pin="1" pinfunction="" />
+      <node ref="C8" pin="1" pinfunction="" />
+      <node ref="D1" pin="1" pinfunction="A1" />
+      <node ref="F1" pin="2" pinfunction="" />
+      <node ref="U1" pin="13" pinfunction="IN" />
+      <node ref="U1" pin="6" pinfunction="EN1" />
+    </net>
+  </nets>
+</export>
