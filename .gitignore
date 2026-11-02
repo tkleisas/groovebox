@@ -52,3 +52,6 @@ nsr2/hardware/ht16k33a_28sop.png
 samples/
 settings.json
 tools/pi_credentials.txt
+
+# Blender backups
+*.blend1

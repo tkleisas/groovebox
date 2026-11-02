@@ -10,7 +10,10 @@ Design language: Soviet-cosmonaut mission control per
 [bokontep.gr](https://www.bokontep.gr) — deep-red faceplate, cream/black
 keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
 
-![virtual front panel](docs/panel_sim.png)
+![NSR-1 exploded assembly](docs/renders/nsr1_exploded_labeled.png)
+
+*Exploded NSR-1 rev B2 assembly, rendered in Blender. More views:
+[`docs/renders/`](docs/renders/).*
 
 ## Two designs, one repo
 
