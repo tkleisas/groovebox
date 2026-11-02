@@ -55,3 +55,6 @@ tools/pi_credentials.txt
 
 # Blender backups
 *.blend1
+
+# Blender animation frames
+docs/renders/frames/

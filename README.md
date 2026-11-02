@@ -12,7 +12,8 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
 
 ![NSR-1 exploded assembly](docs/renders/nsr1_exploded_labeled.png)
 
-*Exploded NSR-1 rev B2 assembly, rendered in Blender. More views:
+*Exploded NSR-1 rev B2 assembly, rendered in Blender. More views and the
+[15-second detail animation](docs/renders/nsr1_animation.mp4):
 [`docs/renders/`](docs/renders/).*
 
 ## Two designs, one repo
