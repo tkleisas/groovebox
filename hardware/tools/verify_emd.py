@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 NETLISTS = {
@@ -38,11 +40,97 @@ def emd_command(explicit):
     return None
 
 
+def _prefix_ids(project, prefix, id_map):
+    """Return a copy of one board project with globally unique ids/keys."""
+    part_map = {part["id"]: str(uuid.uuid5(uuid.NAMESPACE_URL,
+                                           f"groovebox/{prefix}/{part['id']}"))
+                for part in project["parts"]}
+    net_map = {net["id"]: str(uuid.uuid5(uuid.NAMESPACE_URL,
+                                         f"groovebox/{prefix}/{net['id']}"))
+               for net in project["electrical"]["nets"]}
+    board_map = {board["id"]: str(uuid.uuid5(uuid.NAMESPACE_URL,
+                                             f"groovebox/{prefix}/{board['id']}"))
+                 for board in project["electrical"]["boards"]}
+    parts = []
+    for part in project["parts"]:
+        part = json.loads(json.dumps(part))
+        part["id"] = part_map[part["id"]]
+        part["key"] = f"{prefix}_{part['key']}"
+        if part.get("domain_refs", {}).get("electrical"):
+            part["domain_refs"]["electrical"]["ref"] = (
+                f"{prefix}_{part['domain_refs']['electrical']['ref']}")
+        parts.append(part)
+    nets = []
+    for net in project["electrical"]["nets"]:
+        net = json.loads(json.dumps(net))
+        net["id"] = net_map[net["id"]]
+        net["key"] = f"{prefix}_{net['key']}"
+        net["name"] = f"{prefix}.{net['name']}"
+        nets.append(net)
+    boards = []
+    for board in project["electrical"]["boards"]:
+        board = json.loads(json.dumps(board))
+        board["id"] = board_map[board["id"]]
+        board["key"] = f"{prefix}_{board['key']}"
+        board["part_id"] = part_map[board["part_id"]]
+        board["refdes"] = prefix.lower()
+        boards.append(board)
+    connections = []
+    for connection in project["connections"]:
+        connection = json.loads(json.dumps(connection))
+        connection["id"] = str(uuid.uuid5(
+            uuid.NAMESPACE_URL, f"groovebox/{prefix}/{connection['id']}"))
+        connection["key"] = f"{prefix}_{connection['key']}"
+        connection["from"]["part_id"] = part_map[connection["from"]["part_id"]]
+        connection["to"]["net_id"] = net_map[connection["to"]["net_id"]]
+        connections.append(connection)
+    id_map[prefix] = {"parts": part_map, "nets": net_map, "boards": board_map}
+    return parts, nets, boards, connections
+
+
+def merge_projects(control, keyboard, output):
+    combined = json.loads(json.dumps(control))
+    combined["id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, "groovebox/nsr1/combined"))
+    combined["key"] = "groovebox_nsr1"
+    combined["name"] = "groovebox NSR-1"
+    combined["description"] = (
+        "Combined NSR-1 control and keyboard boards imported from KiCad.")
+    combined["metadata"] = {
+        "sources": ["control", "keyboard"],
+        "firmware_map": "panel-fw/src/board_config.h",
+    }
+    id_map = {}
+    parts, nets, boards, connections = [], [], [], []
+    for prefix, project in (("CTRL", control), ("KBD", keyboard)):
+        p, n, b, c = _prefix_ids(project, prefix, id_map)
+        parts += p
+        nets += n
+        boards += b
+        connections += c
+    combined["parts"] = parts
+    combined["connections"] = connections
+    combined["electrical"] = {"nets": nets, "boards": boards}
+    by_id = {part["id"]: part for part in parts}
+    for prefix, source, z in (("CTRL", control, -0.02), ("KBD", keyboard, 0.0)):
+        board = source["electrical"]["boards"][0]
+        part_id = id_map[prefix]["parts"][board["part_id"]]
+        by_id[part_id]["pose"] = {"pos": [0.2, 0.115, z]}
+    combined["mechanical"] = {
+        "assembly_root_part_id": id_map["CTRL"]["parts"][
+            control["mechanical"]["assembly_root_part_id"]]
+    }
+    Path(output).parent.mkdir(parents=True, exist_ok=True)
+    Path(output).write_text(json.dumps(combined, indent=2) + "\n",
+                            encoding="utf-8")
+    return Path(output)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--emd", help="path to the emd executable")
     parser.add_argument("--keep", help="copy generated projects here")
     parser.add_argument("--package-dir", help="write verified EMD packages here")
+    parser.add_argument("--combined", help="write a merged groovebox project here")
     args = parser.parse_args()
     command = emd_command(args.emd)
     if command is None:
@@ -76,6 +164,30 @@ def main():
                 package = Path(args.package_dir) / name
                 run = subprocess.run(
                     command + ["package", "--project", str(project),
+                               "--out-dir", str(package)],
+                    text=True, capture_output=True)
+                print(run.stdout.strip() or run.stderr.strip())
+                if run.returncode != 0:
+                    raise SystemExit(run.returncode)
+                run = subprocess.run(command + ["package", "verify", "--dir", str(package)],
+                                     text=True, capture_output=True)
+                print(run.stdout.strip() or run.stderr.strip())
+                if run.returncode != 0:
+                    raise SystemExit(run.returncode)
+        if args.combined:
+            combined = merge_projects(
+                json.loads((work / "control.json").read_text(encoding="utf-8")),
+                json.loads((work / "keyboard.json").read_text(encoding="utf-8")),
+                args.combined)
+            run = subprocess.run(command + ["validate", str(combined)],
+                                 text=True, capture_output=True)
+            print(run.stdout.strip() or run.stderr.strip())
+            if run.returncode != 0:
+                raise SystemExit(run.returncode)
+            if args.package_dir:
+                package = Path(args.package_dir) / "groovebox"
+                run = subprocess.run(
+                    command + ["package", "--project", str(combined),
                                "--out-dir", str(package)],
                     text=True, capture_output=True)
                 print(run.stdout.strip() or run.stderr.strip())

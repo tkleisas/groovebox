@@ -30,7 +30,8 @@ Export netlists and validate them with EMD:
 ```bash
 python3 hardware/tools/export_netlist.py
 python3 hardware/tools/verify_emd.py --emd /path/to/emd
-python3 hardware/tools/verify_emd.py --package-dir hardware/emd-packages
+python3 hardware/tools/verify_emd.py --package-dir hardware/emd-packages \
+  --combined hardware/emd-packages/groovebox.json
 ```
 
 Check the firmware map against the five-expander contract:
@@ -94,5 +95,8 @@ model because the KiCad container does not ship the 3D model library. Set
 - **Mechanical envelope:** see [`enclosure-spec.md`](enclosure-spec.md);
   the keyboard and under-mounted control board fit the 400 × 170 mm panel,
   with a ~32 mm internal stack. `verify_fit.py` checks this.
+- **EMD package:** the combined project imports both netlists and routed PCBs,
+  aligns the control board under the keyboard, validates 170 parts / 522
+  connections, and produces a verified package.
 - **Not yet done:** final electrical/thermal review of the auto-routed boards,
   and a printable enclosure model.
