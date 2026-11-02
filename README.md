@@ -65,6 +65,23 @@ Full hardware design, GPIO maps and BOM: [docs/design.md](docs/design.md).
 Panel/brain protocol (USB-MIDI + SysEx config):
 [docs/panel-protocol.md](docs/panel-protocol.md).
 
+## ElectroMechanicalDesigner integration
+
+The NSR-1 hardware is imported and validated with
+[**ElectroMechanicalDesigner (EMD)**](https://github.com/tkleisas/ElectroMechanicalDesigner):
+
+- `hardware/tools/export_netlist.py` exports KiCad XML netlists.
+- `hardware/tools/verify_emd.py` imports both netlists and routed PCBs,
+  validates them, and builds a combined **170-part / 522-connection** project.
+- The combined project is placed in the 400 × 170 mm panel envelope and its
+  package is verified with `emd package verify`.
+- Generated projects/packages live in `hardware/emd-packages/` (gitignored);
+  regenerate with
+  `python3 hardware/tools/verify_emd.py --combined hardware/emd-packages/groovebox.json --package-dir hardware/emd-packages`.
+
+EMD also validates the KiCad ERC/DRC flow, mounting-hole mechanical ports, and
+fabrication exports used by this repo.
+
 ## Architecture
 
 ```
@@ -230,7 +247,7 @@ semantics, LED count) for interactive, test, and dump modes
 | `docs/` | design documents: NSR-1 `design.md`, panel ↔ brain protocol (`panel-protocol.md`), NSR-2 `nsr2-design.md`, mockups & generated charts |
 | `emulator/` | the groovebox app + device emulator (`hal.h`, SimBackend = SDL3 desktop, PiBackend = headless Pi fbdev+RtMidi, PanelView, ui, widgets, font5x7, pattern…), `pi/` = arm64 cross-build (Dockerfile + toolchain) |
 | `panel-fw/` | Raspberry Pi Pico firmware (TinyUSB USB-MIDI panel controller, protocol v1 + GRV SysEx config) |
-| `hardware/` | NSR-1 rev B2 hardware: netlist spec, generator/verifier, generated schematics, KiCad projects (keyboard & control boards) |
+| `hardware/` | NSR-1 rev B2 hardware: netlist spec, generator/verifier, generated schematics, routed KiCad boards, enclosure/faceplate, and ElectroMechanicalDesigner integration/package checks |
 | `nsr2/` | the NSR-2 compact variant: netlist spec, generated KiCad schematics, footprint library, enclosure spec, mockup |
 | `os-image/` | Raspberry Pi OS Lite customization — boots straight into the app (~10 s to sound) |
 | `tools/` | mockup generators (panel, UI), rgb565 conversion |
@@ -265,7 +282,7 @@ Software milestones (emulator-first):
   verified), `--profile N` heavy-load harness (4 tracks dense, 140 BPM,
   reverb ×2, per-second CPU% + xrun flags).
 - **M4** — bench rig: codec, panel firmware on real hardware, display.
-- **M5** — battery, enclosure, custom PCB if it earns one.
+- **M5** — battery, enclosure, rev B2 routed PCBs, and the verified EMD assembly package.
 
 ## Conventions
 

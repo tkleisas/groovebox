@@ -2,6 +2,8 @@
 
 A standalone, battery-powered groovebox built on Raspberry Pi Zero 2W,
 using the [yawn](https://github.com/tkleisas/yawn) audio engine as the DSP core.
+The NSR-1 hardware is imported, validated, and packaged with
+[ElectroMechanicalDesigner](https://github.com/tkleisas/ElectroMechanicalDesigner).
 
 **Identity: ВОКОИТЕР – ΟΡΓΑΝΟ 1.** Deep-red faceplate (Nord/Elektron red
 family), white/black MX keys, near-black shift keys, off-white panel print;

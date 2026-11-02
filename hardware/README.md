@@ -1,5 +1,10 @@
 # NSR-1 hardware — rev B2
 
+This hardware is imported and packaged by
+[ElectroMechanicalDesigner](https://github.com/tkleisas/ElectroMechanicalDesigner);
+see [`../README.md`](../README.md#electromechanicaldesigner-integration) and
+`hardware/tools/verify_emd.py`.
+
 Source of truth: [`netlist-spec.md`](netlist-spec.md). The firmware contract is
 `panel-fw/src/board_config.h`; change both together.
 
