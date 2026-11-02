@@ -50,8 +50,8 @@ def main():
     cuts.append(rect(8 + 48, 10 + 34, 96, 68))
     for y in (14, 29, 44, 59):
         cuts.append(rect(108 + 7, y + 5.5, 14, 11))
-    for x in (20, 45, 70, 95):
-        cuts.append(circle(x, 88, 3.5))
+    for x in (30, 55, 80, 105):
+        cuts.append(circle(x, 86, 3.5))
     for x in (140, 158):
         cuts.append(circle(x, 32, 3.5))
     for x in (184, 202, 220, 238):

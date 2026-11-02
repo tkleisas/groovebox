@@ -1,7 +1,8 @@
 # NSR-1 renders
 
 Generated with Blender 4.0 from the FreeCAD tray/faceplate and the rev B2 board
-layout:
+layout. The camera matches the reference panel orientation (screen top-left,
+keyboard/step rows at the bottom); the exploded boards fan to the left.
 
 - `nsr1_exploded_labeled.png` — exploded assembly (faceplate, keyboard PCB +
   switches, control PCB, tray)

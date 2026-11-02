@@ -91,8 +91,8 @@ for i, y in enumerate((14, 29, 44, 59)):
     rect(108, y, 14, 11, (55, 55, 62), outline=(140, 140, 150), label=f"S{i+1}")
 
 # encoders under the screen (labels on screen)
-for cx in (20, 45, 70, 95):
-    knob(cx, 88, 7, "")
+for cx in (30, 55, 80, 105):
+    knob(cx, 86, 7, "")
 
 # pots (filter) + ADSR encoders, top middle
 label("FILTER", 134, 17)
