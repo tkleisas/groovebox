@@ -198,7 +198,7 @@ def main():
 
     # LED dots on the step keys.
     for i in range(16):
-        led = cyl(f"step led {i}", ox + white_x(i) - 200, 85 - (oy + STEP_Y),
+        led = cyl(f"step led {i}", ox + white_x(i) - 200, oy + STEP_Y - 85,
                   44.7, 0.9, 0.5, mat(f"led {i}", (0.8, 0.02, 0.02), rough=0.2,
                                       emit=(1.0, 0.02, 0.01), emit_strength=4.0))
         parent(led, keys)
@@ -261,9 +261,9 @@ def main():
     for group in (face_labels, key_labels, screen_labels):
         group.parent = None
     for body, x, y, size in (
-        ("FILTER", 134, 17, 5.5), ("AMP ENVELOPE", 176, 17, 5.5),
-        ("TRANSPORT", 310, 9, 5.5), ("SOFT KEYS", 108, 82.5, 5.5),
-        ("STEPS", 328, 160, 5.5), ("DATA SLIDER", 310, 94, 5.5),
+        ("FILTER", 149, 17, 5.5), ("AMP ENVELOPE", 211, 17, 5.5),
+        ("TRANSPORT", 334.5, 9, 5.5), ("SOFT KEYS", 115, 4.5, 4.5),
+        ("STEPS", 350, 160, 5.5), ("DATA SLIDER", 341, 94, 5.5),
     ):
         text_obj(f"label {body}", body, x - 200, 85 - y, 35.4, size,
                  face_labels, cream)
