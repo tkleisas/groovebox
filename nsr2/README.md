@@ -1,5 +1,9 @@
 # NSR-2 — Directory Guide & Collaboration Contract
 
+> **Status: deferred.** NSR-1 is the active hardware target. NSR-2 is kept
+> as a schematic-complete reference design; do not start new layout or
+> firmware work here without an explicit decision to revive it.
+
 NSR-2 is the compact sibling of NSR-1 (this repo's `docs/design.md` rev A).
 Design docs: `docs/nsr2-design.md`, `nsr2/netlist-spec.md`,
 `nsr2/enclosure-spec.md`.

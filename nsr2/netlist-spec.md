@@ -1,5 +1,9 @@
 # NSR-2 netlist specification — rev A
 
+> **Status: deferred.** NSR-1 is the active hardware target. This spec is
+> retained as a reference; do not start new layout or firmware work from it
+> without an explicit decision to revive NSR-2.
+
 Definitive hardware↔firmware contract for the two NSR-2 boards. Firmware
 side lives in `panel-fw/src/board_config.h` (`PANEL_NSR2` variant); any
 change here must update that file (and vice versa) in the same commit.

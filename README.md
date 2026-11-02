@@ -1,10 +1,17 @@
 # groovebox — ВОКОИТЕР / ΟΡΓΑΝΟ
 
-A standalone, battery-powered groovebox: a **Raspberry Pi Zero 2W** brain
-running the [yawn](https://github.com/tkleisas/yawn) audio engine, with a
-**Raspberry Pi Pico** panel module presenting the whole control surface to
-the Pi as a plain USB-MIDI device. Screen, step-sequencer LEDs, encoders,
-mic — everything else hangs off those two chips.
+**Mission:** an open hardware and software groovebox that can be serviced
+indefinitely. If a subsystem becomes unavailable, an equivalent one can be
+substituted without discarding the panel, power system, enclosure, or
+software. The reference brain is a **Raspberry Pi Zero 2W** on a replaceable
+carrier, running the [yawn](https://github.com/tkleisas/yawn) audio engine;
+a **Raspberry Pi Pico** panel module presents the whole control surface to
+the brain as a plain USB-MIDI device.
+
+Each SBC gets its own brain carrier and its own validated software profile;
+the panel, power board, battery, and enclosure are the common platform. See
+[`docs/mission.md`](docs/mission.md) for the mission, support tiers, and the
+honest path for future Radxa/Orange Pi carriers.
 
 Design language: Soviet-cosmonaut mission control per
 [bokontep.gr](https://www.bokontep.gr) — deep-red faceplate, cream/black
@@ -20,10 +27,10 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
 
 | | NSR-1 (ΟΡΓΑΝΟ 1) | NSR-2 |
 |---|---|---|
-| Concept | full-size panel, 400 × 150 mm | compact, 180 × 210 mm faceplate PCB |
+| Concept | full-size panel, 400 × 170 mm | compact, 180 × 210 mm faceplate PCB |
 | Keys | 55 MX keys (piano + 16-step row + function) | 45 Choc keys (4×8 grid) + 13 function |
 | Control | 8 encoders, 2 pots, data slider, thumbstick | 4 encoders, thumbstick, crossfader |
-| Status | rev B2 schematics + ERC 0 errors; both boards routed, 0 DRC, EMD package verified | schematic-complete, **0 ERC errors**, footprints assigned |
+| Status | **active target.** rev B2 control/keyboard routed and verified; Pi brain carrier schematic complete; power board next | **deferred.** schematic-complete reference design; not the current build |
 | Docs | [`docs/design.md`](docs/design.md) + [`hardware/README.md`](hardware/README.md) | [`docs/nsr2-design.md`](docs/nsr2-design.md) + [`nsr2/README.md`](nsr2/README.md) |
 
 ## What it does (emulator, today)
@@ -56,16 +63,18 @@ keys, bilingual Greek/Cyrillic UI strings, terminal-green telemetry.
 
 | | |
 |---|---|
-| Brain | Raspberry Pi Zero 2W (≥5 h battery is a hard requirement) |
+| Brain | Raspberry Pi Zero 2W on the first SBC-specific carrier; separate carriers planned per SBC |
 | Panel controller | Raspberry Pi Pico — presents as USB-MIDI device `groovebox-panel` |
-| Audio codec | Audio Injector Zero (WM8731: stereo out + mic/line in). Bench rig: CJMCU-1334 (UDA1334A, playback only) |
+| Audio codec | Audio Injector Zero (WM8731: stereo out + mic/line in) on the Pi carrier. Bench rig: CJMCU-1334 (UDA1334A, playback only) |
 | Display | 4.0" SPI TFT 480×320 (ILI9488); UI rendered at 240×160, 2× integer scale |
 | Keys | 55 MX-style switches (Gateron Red / Silent Red), hot-swap sockets, 32 LEDs, 19.05 mm pitch |
 | Panel I/O | 5× MCP23017 (55 keys + 8 encoder pushes), HT16K33 (32 LEDs), 2× ADS1115 (2 pots + slider + joystick) |
-| Power | LiPo + Adafruit PowerBoost 1000C |
+| Power | Separate 1S power/battery board (USB-C charger, power path, 5V/3A boost, fuel gauge); 5000 mAh target |
 | Panel size | 400×170 mm, deep red |
 
 Full hardware design, GPIO maps and BOM: [docs/design.md](docs/design.md).
+New platform board specs: [Pi Zero 2W brain carrier](hardware/brain/netlist-spec.md)
+and [power/battery board](hardware/power/netlist-spec.md).
 Panel/brain protocol (USB-MIDI + SysEx config):
 [docs/panel-protocol.md](docs/panel-protocol.md).
 
@@ -89,11 +98,14 @@ fabrication exports used by this repo.
 ## Architecture
 
 ```
-  Pi Zero 2W (brain)                      Pico (panel module)
+  Pi Zero 2W on brain carrier             Pico (panel module)
   ├ yawn engine (I2S codec)      ◄─USB─►  ├ keys    (5× MCP23017)
   ├ fbdev UI → 480×320 SPI TFT            ├ LEDs    (HT16K33)
   ├ DIN MIDI in/out (UART)                ├ encoders (GPIO)
   └ mic (codec input)                     └ analog  (2× ADS1115)
+            ▲ 5V / power signals
+            │
+  Power/battery board — USB-C charge, 1S pack, gauge, 5V boost
 ```
 
 The panel is deliberately dumb — it reports physical events and accepts
@@ -248,22 +260,22 @@ semantics, LED count) for interactive, test, and dump modes
 
 | Path | What it is |
 |---|---|
-| `docs/` | design documents: NSR-1 `design.md`, panel ↔ brain protocol (`panel-protocol.md`), NSR-2 `nsr2-design.md`, mockups & generated charts |
+| `docs/` | design documents: mission/strategy (`mission.md`), NSR-1 `design.md`, panel ↔ brain protocol (`panel-protocol.md`), NSR-2 `nsr2-design.md`, mockups & generated charts |
 | `emulator/` | the groovebox app + device emulator (`hal.h`, SimBackend = SDL3 desktop, PiBackend = headless Pi fbdev+RtMidi, PanelView, ui, widgets, font5x7, pattern…), `pi/` = arm64 cross-build (Dockerfile + toolchain) |
 | `panel-fw/` | Raspberry Pi Pico firmware (TinyUSB USB-MIDI panel controller, protocol v1 + GRV SysEx config) |
-| `hardware/` | NSR-1 rev B2 hardware: netlist spec, generator/verifier, generated schematics, routed KiCad boards, enclosure/faceplate, and ElectroMechanicalDesigner integration/package checks |
-| `nsr2/` | the NSR-2 compact variant: netlist spec, generated KiCad schematics, footprint library, enclosure spec, mockup |
+| `hardware/` | **active NSR-1 platform:** control/keyboard, Pi carrier, power board, enclosure/faceplate, and ElectroMechanicalDesigner integration/package checks |
+| `nsr2/` | the deferred NSR-2 compact reference design: netlist spec, generated KiCad schematics, footprint library, enclosure spec, mockup |
 | `os-image/` | Raspberry Pi OS Lite customization — boots straight into the app (~10 s to sound) |
 | `tools/` | mockup generators (panel, UI), rgb565 conversion |
 | `yawn/` | the audio engine (git submodule) |
 
 ## Status & roadmap
 
-NSR-2 is the active design: schematics generated and ERC-clean, board
-outlines drawn (180 × 210 faceplate with screen window, 100 × 80 brain
-carrier), 3D-printed enclosure specified. Next: PCB layout, firmware
-`PANEL_NSR2` variant, emulator `--panel=nsr2` profile. NSR-1 remains the
-reference for the audio engine bring-up and the panel protocol.
+NSR-1 is the active hardware target. The rev B2 control and keyboard
+boards are routed, DRC-clean, and EMD-verified. Next: the Raspberry Pi Zero
+2W brain carrier, the separate power/battery board, and the NSR-1 enclosure
+update for both. NSR-2 is retained as a schematic-complete reference but is
+deferred; it is not the current build.
 
 Software milestones (emulator-first):
 
@@ -286,7 +298,7 @@ Software milestones (emulator-first):
   verified), `--profile N` heavy-load harness (4 tracks dense, 140 BPM,
   reverb ×2, per-second CPU% + xrun flags).
 - **M4** — bench rig: codec, panel firmware on real hardware, display.
-- **M5** — battery, enclosure, rev B2 routed PCBs, and the verified EMD assembly package.
+- **M5 in progress** — battery, enclosure, rev B2 routed PCBs, and the verified EMD assembly package. The NSR-1 brain carrier and power board are the current hardware work.
 
 ## Conventions
 

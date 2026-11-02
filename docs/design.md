@@ -1,9 +1,12 @@
 # Groovebox — Hardware & Software Design
 
-A standalone, battery-powered groovebox built on Raspberry Pi Zero 2W,
-using the [yawn](https://github.com/tkleisas/yawn) audio engine as the DSP core.
-The NSR-1 hardware is imported, validated, and packaged with
+A standalone, battery-powered groovebox built on a replaceable Raspberry Pi
+Zero 2W brain carrier, using the [yawn](https://github.com/tkleisas/yawn)
+audio engine as the DSP core. The NSR-1 hardware is imported, validated, and
+packaged with
 [ElectroMechanicalDesigner](https://github.com/tkleisas/ElectroMechanicalDesigner).
+The platform mission and SBC-carrier strategy are in
+[`mission.md`](mission.md).
 
 **Identity: ВОКОИТЕР – ΟΡΓΑΝΟ 1.** Deep-red faceplate (Nord/Elektron red
 family), white/black MX keys, near-black shift keys, off-white panel print;
@@ -15,21 +18,34 @@ bilingual Greek/Cyrillic UI strings, telemetry-style status pages.
 Three screen themes: MONO (white/gray on near-black), RED (bright/light red —
 matches the faceplate), GREEN (bright/light green phosphor).
 
-## Core decision
+## Reference brain and serviceability
 
-**Pi Zero 2W, fixed by a hard requirement: ≥5 h battery life.**
+**Pi Zero 2W is the first reference brain, not a permanent dependency.**
+
+The platform promise is serviceability, not a single-SBC bet. Each supported
+SBC gets its own brain carrier PCB and its own validated OS/device-tree
+profile. The panel, power board, battery, enclosure, and software platform
+remain common. See [`mission.md`](mission.md) for the support tiers and the
+honest Radxa/Orange Pi path.
+
+Pi Zero 2W is first because it has the most mature software path and the
+existing Audio Injector Zero/ILI9488 recipes. The ≥5 h battery-life target is
+still a hard requirement for the reference build; battery capacity and the new
+power board are covered below.
 
 Considered alternatives:
 - Pi 4B: ~3–4× CPU headroom and up to 8 GB RAM, but 3–5 W draw cuts
-  battery life to ~2–3 h and it wants a heatsink. Rejected on the battery
-  requirement alone.
+  battery life to ~2–3 h and it wants a heatsink. Not the reference carrier.
 - CM4: right answer only for a custom carrier PCB / production run.
   Revisit if the box ever goes beyond a one-off.
 - Pi 5: power draw and active cooling make it wrong for portable use.
+- Radxa Zero 3W / Orange Pi Zero 3W: future separate carriers. They are not
+  drop-in Pi replacements because USB host, audio, display overlays, mounting
+  holes, and power input differ.
 
 Consequences:
-- The core is a swappable module — everything hangs off the standard 40-pin
-  header, so a Pi 4B could drop in later with only battery/heatsink changes.
+- A new SBC requires a new carrier and a new bring-up checklist; it is not a
+  header swap.
 - Milestone 1 must include profiling on the Zero 2W: target workload =
   4 tracks (drum rack + synth + 2–3 FX per track) at 128 frames / 48 kHz.
   Ship criterion: sustained CPU ≤ ~60–65% with no xruns. If it fails, the
@@ -61,7 +77,7 @@ Consequences:
 
 | Part | Choice | ~Cost |
 |---|---|---|
-| Brain | Raspberry Pi Zero 2W | $15 |
+| Brain | Raspberry Pi Zero 2W on a replaceable carrier | $15 + carrier PCB |
 | Panel controller | Raspberry Pi Pico (RP2040) — USB-MIDI bridge for all panel I/O | $5 |
 | Audio codec (final) | Audio Injector Zero (WM8731: stereo out + mic/line in, stacks on header) | $18 |
 | Audio out (bench rig) | CJMCU-1334 = **UDA1334A** I2S DAC, already on hand + proven wiring (`hifiberry-dac` overlay). Playback only — no ADC | $0 |
@@ -76,8 +92,33 @@ Consequences:
 | Data slider | 60 mm slide pot (velocity default; live filter/FX sweeps) | $3 |
 | Encoders | 4× rotary encoder with push | $5 |
 | DIN MIDI | 2× 5-pin DIN sockets (in+out), 6N138 optocoupler, resistors | $5 |
-| Power | LiPo 2000–3000 mAh + Adafruit PowerBoost 1000C | $20 |
+| Power | Separate power/battery board: USB-C charger, power path, fuel gauge, 5V/3A boost; 1S Li-ion/LiPo 5000 mAh target | ~$25 + pack |
 | Misc | Power switch, perfboard, headers, enclosure | $5 |
+
+## Platform hardware
+
+The NSR-1 platform is four boards plus the enclosure:
+
+| Board | Role | Status |
+|---|---|---|
+| Keyboard | 45 piano/step keys, 3× MCP23017, HT16K33, 32 LEDs | routed, 0 DRC |
+| Control | Pico panel module, analog/encoder/key connectors | routed, 0 DRC |
+| Brain carrier | Pi Zero 2W socket, Audio Injector stack, display, DIN MIDI, panel USB | rev A schematic generated, netlist EMD-valid |
+| Power/battery | USB-C charge, 1S pack, gauge, 5V/3A boost, power path | rev A spec + outline; schematic next |
+
+The brain carrier is SBC-specific by design. The Pi Zero 2W carrier is the
+first one; a Radxa Zero 3W or Orange Pi Zero 3W carrier would be a separate
+PCB, not an adapter on the Pi carrier. The control and keyboard boards are
+unchanged by the SBC choice.
+
+The power board is also separate from the brain carrier. It owns charging,
+battery protection, fuel gauging, power switching, and the 5V rail; the brain
+carrier only consumes 5V and exposes the power-button/gauge signals. The
+battery is replaceable and lives in its own enclosure bay.
+
+The enclosure uses a common M3 mounting frame with replaceable brain adapter
+plates and rear I/O plates. See
+[`../hardware/enclosure-spec.md`](../hardware/enclosure-spec.md).
 
 ## Control surface
 
@@ -130,7 +171,9 @@ sequencer, per-step LEDs), 1u SHIFT keys at the piano row ends, horizontal
 
 ## GPIO / I2C allocation
 
-**Pi Zero 2W (40-pin header)** — Pi keeps only display, codec, and DIN MIDI:
+**Pi Zero 2W reference carrier (40-pin header)** — the Pi keeps only
+display, codec, and DIN MIDI. Alternate SBC carriers must reproduce this
+contract or document the deviation:
 
 | Bus | Pins | Device |
 |---|---|---|
@@ -187,8 +230,8 @@ real yawn engine natively (PortAudio/WASAPI) — UI, page flow, controller
 mapping and sequencer logic are all proven before hardware exists.
 Milestones: M1 emulator skeleton + headless yawn on PC → M2 full UI +
 controller mapping in emulator → M3 cross-compile to Pi, Pi HAL backend,
-CPU profiling (Zero 2W viability gate) → M4 bench rig → M5 battery +
-enclosure.
+CPU profiling (Zero 2W viability gate) → M4 bench rig with the Pi brain
+carrier → M5 power board, battery, and NSR-1 enclosure.
 
 **Panel module (Raspberry Pi Pico).** All panel I/O — 55 single-ended keys
 on 5× MCP23017, 32 in-switch LEDs on HT16K33 (driver only), 8 encoders,
@@ -254,7 +297,8 @@ Constraints / decisions:
 1. **Engine on the Pi** — headless yawn build (heavy features off), driven by
    a Lua script, audio out via PCM5102A. De-risks everything; pure software.
 2. **Bench rig** — breadboard: encoders, a few buttons, display;
-   input → controller backend → engine loop working.
+   input → controller backend → engine loop working, then the Pi brain
+   carrier with the Audio Injector and panel over USB.
 3. **fbdev UI** on the 480×320.
 4. **Full control surface** — HT16K33 buttons/LEDs, ADS1115 pots/slider.
-5. **Battery + enclosure**, custom PCB if more than one unit is wanted.
+5. **Power board + battery + enclosure** for the NSR-1 platform.

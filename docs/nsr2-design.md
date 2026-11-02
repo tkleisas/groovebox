@@ -1,5 +1,9 @@
 # NSR-2 — Compact Panel Variant
 
+> **Status: deferred.** NSR-1 is the active hardware target. NSR-2 is kept
+> as a schematic-complete reference design; do not start new layout or
+> firmware work here without an explicit decision to revive it.
+
 NSR-2 is the compact sibling of NSR-1 (this repo's `design.md` rev A).
 Same architecture: Pi Zero 2W brain + Pico panel module as a USB-MIDI
 device, yawn engine, same panel↔brain protocol v1. The panel is rebuilt

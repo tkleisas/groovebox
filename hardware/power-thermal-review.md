@@ -35,3 +35,21 @@ keyboard is powered over the Pico USB link. No 5V load requires a wider trace.
   2-layer process).
 - B.Cu GND pours filled on both boards.
 - Mounting holes: 4× M3 per board.
+
+## Platform power board (rev A)
+
+The NSR-1 platform moves battery charging, boost conversion, and fuel gauging
+to a separate power board; see
+[`power/netlist-spec.md`](power/netlist-spec.md). The current control/keyboard
+3V3 budget above remains unchanged.
+
+Target: 1S 5000 mAh-class pack, USB-C charge input, 5V/2.5A continuous output
+for the Pi carrier, and 5V/3A peak. At 85% conversion, a 5000 mAh pack is
+about 15.7 Wh delivered: roughly 6.3 h at a 2.5 W average load, 3.1 h at 5 W,
+and 2.1 h at 7.5 W. Measure the real Pi + Audio Injector + display + panel
+load before publishing a runtime claim.
+
+Thermal rules: keep the battery away from the boost inductor, charger, and SBC
+heatsink; use 2 oz copper and thermal vias on the power board; validate the
+closed enclosure at 2.5A output. The battery needs swelling clearance and a
+replaceable connector, not a soldered pouch.

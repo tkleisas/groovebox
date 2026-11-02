@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate KiCad schematics for the rev B2 NSR-1 control and keyboard boards.
+"""Generate KiCad schematics for the NSR-1 control, keyboard, and brain boards.
 
 The NSR-2 generator already provides the KiCad 10 schematic writer and
 embedded symbol reader.  This generator reuses those helpers and pulls the
@@ -9,6 +9,7 @@ on a local KiCad installation.
 Usage:  python hardware/tools/gen_schematics.py
 Writes: hardware/control/control.kicad_sch
         hardware/keyboard/keyboard.kicad_sch
+        hardware/brain/brain.kicad_sch
 """
 from __future__ import annotations
 
@@ -71,11 +72,11 @@ class EmbeddedSymLib(kicad.SymLib):
         raise KeyError(f"symbol '{lib_id}' is not in the NSR-2 symbol set")
 
 
-def _save(board, path, date):
+def _save(board, path, date, rev="B2"):
     board.save(str(path))
     text = path.read_text(encoding="utf-8")
     text = text.replace('(date "2026-08-31")', f'(date "{date}")')
-    text = text.replace('(rev "A")', '(rev "B2")')
+    text = text.replace('(rev "A")', f'(rev "{rev}")')
     path.write_text(text, encoding="utf-8", newline="\n")
     print("wrote", path)
 
@@ -278,6 +279,104 @@ def keyboard(lib, date):
     _save(b, OUT_DIR / "keyboard" / "keyboard.kicad_sch", date)
 
 
+def brain(lib, date):
+    b = Nsr1Board(lib, "brain", "NSR-1 brain carrier (Pi Zero 2W, rev A)")
+    b.text("NSR-1 BRAIN CARRIER - Pi Zero 2W, display, DIN MIDI, panel USB", 25, 25, 3.0)
+
+    pi = {
+        1: "@+3V3", 2: "@+5V", 4: "@+5V",
+        3: "SDA", 5: "SCL",
+        8: "MIDI_TX", 10: "MIDI_RX",
+        11: "LOW_BATT", 15: "SHUTDOWN",
+        13: "LCD_BL", 18: "LCD_DC", 19: "LCD_MOSI", 22: "LCD_RST",
+        23: "LCD_SCLK", 24: "LCD_CS", 17: "@+3V3",
+    }
+    for p in (6, 9, 14, 20, 25, 30, 34, 39):
+        pi[p] = "@GND"
+    pi_nc = [7, 12, 16, 21, 26, 27, 28, 29, 31, 32, 33, 35, 36, 37, 38, 40]
+    b.place("Connector_Generic:Conn_02x20_Odd_Even", "J", "Pi_Zero_2W",
+            45, 100, "Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical",
+            "2x20 female header (Pi Zero 2W socket)", pi, pi_nc)
+
+    b.place("Connector_Generic:Conn_01x08", "J", "ILI9488_4.0in",
+            230, 45, "Connector_PinHeader_2.54mm:PinHeader_1x08_P2.54mm_Horizontal",
+            "4.0 inch 480x320 SPI TFT", {
+                1: "@+3V3", 2: "@GND", 3: "LCD_CS", 4: "LCD_RST",
+                5: "LCD_DC", 6: "LCD_MOSI", 7: "LCD_SCLK", 8: "LCD_BL"})
+
+    b.place("Connector_Generic:Conn_01x05", "J", "DIN5_MIDI_OUT",
+            290, 110, "nsr1_fp:DIN5-RA-PTH",
+            "MIDI OUT right-angle DIN-5", {
+                2: "@GND", 4: "MIDI_OUT_P4", 5: "@GND"}, [1, 3])
+    b.place("Connector_Generic:Conn_01x05", "J", "DIN5_MIDI_IN",
+            290, 145, "nsr1_fp:DIN5-RA-PTH",
+            "MIDI IN right-angle DIN-5", {
+                2: "@GND", 4: "MIDI_IN_P4", 5: "MIDI_IN_K"}, [1, 3])
+    b.place("Device:R", "R", "33R", 225, 105,
+            "Resistor_SMD:R_0805_2012Metric", "MIDI OUT series",
+            {1: "MIDI_TX", 2: "MIDI_OUT_P4"})
+    b.place("Device:R", "R", "220R", 225, 130,
+            "Resistor_SMD:R_0805_2012Metric", "MIDI IN LED series",
+            {1: "MIDI_IN_P4", 2: "MIDI_IN_A"})
+    b.place("Isolator:6N138", "U", "6N138", 225, 170,
+            "Package_DIP:DIP-8_W7.62mm", "MIDI IN optocoupler",
+            pin_nets={2: "MIDI_IN_A", 3: "MIDI_IN_K", 5: "@GND",
+                      6: "MIDI_RX", 8: "@+5V"}, nc_pins=[1, 4, 7])
+    b.place("Device:R", "R", "10k", 175, 175,
+            "Resistor_SMD:R_0805_2012Metric", "MIDI RX pull-up",
+            {1: "@+5V", 2: "MIDI_RX"})
+
+    b.place("Power_Protection:USBLC6-2P6", "U", "USBLC6-2P6", 225, 220,
+            "Package_TO_SOT_SMD:SOT-23-6", "USB ESD protection",
+            pin_nets={1: "USB_DP", 6: "USB_DP", 3: "USB_DM", 4: "USB_DM",
+                      2: "@GND", 5: "@+5V"})
+    b.place("Connector:USB_A", "J", "USB_A_PANEL", 290, 220,
+            "Connector_USB:USB_A_Connfly_DS1098_Horizontal",
+            "panel USB-A host port (Pi OTG breakout)",
+            pin_names={"VBUS": "@+5V", "D-": "USB_DM", "D+": "USB_DP",
+                       "GND": "@GND", "Shield": "@GND"})
+
+    b.place("Connector_Generic:Conn_01x02", "J", "PWR_IN", 290, 260,
+            "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
+            "5V input from power board", {1: "@+5V", 2: "@GND"})
+    b.place("Connector_Generic:Conn_01x04", "J", "PWR_GAUGE", 250, 260,
+            "Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical",
+            "power-board fuel gauge I2C",
+            {1: "@+3V3", 2: "@GND", 3: "SDA", 4: "SCL"})
+    b.place("Connector_Generic:Conn_01x02", "J", "LOW_BATT", 205, 260,
+            "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
+            "low-battery alert from power board",
+            {1: "LOW_BATT", 2: "@GND"})
+    b.place("Connector_Generic:Conn_01x02", "J", "SHUTDOWN", 160, 260,
+            "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
+            "external shutdown button",
+            {1: "SHUTDOWN", 2: "@GND"})
+    b.place("Switch:SW_Push", "SW", "SHUTDOWN", 120, 262,
+            "Button_Switch_THT:SW_PUSH_6mm", "shutdown button (GPIO22)",
+            pin_nets={1: "SHUTDOWN", 2: "@GND"})
+    b.place("Connector_Generic:Conn_01x02", "J", "MIC", 75, 260,
+            "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
+            "electret mic capsule",
+            {1: "MIC_SIG", 2: "@GND"})
+    b.place("Connector_Generic:Conn_01x02", "J", "MIC_TO_HAT", 75, 285,
+            "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
+            "mic signal to Audio Injector input",
+            {1: "MIC_SIG", 2: "@GND"})
+
+    b.place("Device:R", "R", "4k7", 140, 70,
+            "Resistor_SMD:R_0805_2012Metric", "I2C SDA pull-up",
+            {1: "@+3V3", 2: "SDA"})
+    b.place("Device:R", "R", "4k7", 165, 70,
+            "Resistor_SMD:R_0805_2012Metric", "I2C SCL pull-up",
+            {1: "@+3V3", 2: "SCL"})
+    for i, rail in enumerate(("@+5V", "@+3V3", "@+5V", "@+3V3")):
+        b.place("Device:C", "C", "100n", 140 + i * 25, 300,
+                "Capacitor_SMD:C_0805_2012Metric", "decoupling",
+                {1: rail, 2: "@GND"})
+    b.power_flags(("+5V", "+3V3", "GND"), 25, 340)
+    _save(b, OUT_DIR / "brain" / "brain.kicad_sch", date, rev="A")
+
+
 def main():
     today = _dt.date.today().isoformat()
     lib = EmbeddedSymLib([
@@ -286,6 +385,7 @@ def main():
     ])
     control(lib, today)
     keyboard(lib, today)
+    brain(lib, today)
 
 
 if __name__ == "__main__":

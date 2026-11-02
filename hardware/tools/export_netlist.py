@@ -16,6 +16,7 @@ from verify_schematics import EmbeddedSymLib, ROOT, collect_pins
 BOARDS = {
     "control": ROOT / "hardware" / "control" / "control.kicad_sch",
     "keyboard": ROOT / "hardware" / "keyboard" / "keyboard.kicad_sch",
+    "brain": ROOT / "hardware" / "brain" / "brain.kicad_sch",
 }
 
 
@@ -64,7 +65,7 @@ def export(board, path, lib, output):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--board", choices=["control", "keyboard", "all"], default="all")
+    parser.add_argument("--board", choices=["control", "keyboard", "brain", "all"], default="all")
     parser.add_argument("--out-dir", default=str(ROOT / "hardware"))
     args = parser.parse_args()
     lib = EmbeddedSymLib([
