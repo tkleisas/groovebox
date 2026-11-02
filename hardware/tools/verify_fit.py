@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PANEL = (400.0, 170.0)
-KEYBOARD_ORIGIN = (22.0, 90.0)
+KEYBOARD_ORIGIN = (0.9, 86.0)
 CONTROL_ORIGIN = (140.0, 65.0)
 LINE = re.compile(
     r"\(gr_line\s+\(start\s+([-\d.]+)\s+([-\d.]+)\)\s+"

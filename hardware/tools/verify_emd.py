@@ -114,7 +114,8 @@ def merge_projects(control, keyboard, output):
     for prefix, source, z in (("CTRL", control, -0.02), ("KBD", keyboard, 0.0)):
         board = source["electrical"]["boards"][0]
         part_id = id_map[prefix]["parts"][board["part_id"]]
-        by_id[part_id]["pose"] = {"pos": [0.2, 0.11 if prefix == "CTRL" else 0.13, z]}
+        center = (0.2, 0.11) if prefix == "CTRL" else (0.1789, 0.126)
+        by_id[part_id]["pose"] = {"pos": [center[0], center[1], z]}
     combined["mechanical"] = {
         "assembly_root_part_id": id_map["CTRL"]["parts"][
             control["mechanical"]["assembly_root_part_id"]]
