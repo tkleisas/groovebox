@@ -41,10 +41,10 @@ gcc -std=c11 -Ipanel-fw/src hardware/tools/check_board_config.c -o /tmp/check_bo
 /tmp/check_board_config
 ```
 
-The board outlines are updated to rev B2: control 120 × 90 mm, keyboard
-356 × 100 mm. Placement and routing are hand-owned and remain to be done. The
-MX hot-swap footprint is vendored from the keyswitch-kicad-library
-(`nsr1_fp`, CC-BY-SA 4.0) and is assigned to all 45 switch symbols.
+The board outlines are rev B2: control 120 × 90 mm, keyboard 356 × 80 mm.
+Both boards are placed, routed, and checked. The MX hot-swap footprint is
+vendored from the keyswitch-kicad-library (`nsr1_fp`, CC-BY-SA 4.0) and is
+assigned to all 45 switch symbols.
 
 ## KiCad checks
 
@@ -90,11 +90,10 @@ model because the KiCad container does not ship the 3D model library. Set
   `hardware/tools/place_keyboard.py`, then routed with Freerouting; DRC
   reports 0 violations and 0 unconnected items. Four M3 mounting-hole
   footprints are present for EMD mechanical ports.
-- **Ground pour:** both boards have a filled B.Cu GND zone; the control board
-  uses solid pad connections, the keyboard board uses thermal reliefs.
+- **Ground pour:** both boards have a filled B.Cu GND zone; both boards use solid pad connections on the B.Cu GND pour.
 - **Mechanical envelope:** see [`enclosure-spec.md`](enclosure-spec.md);
-  the keyboard and under-mounted control board fit the 400 × 170 mm panel,
-  with a ~32 mm internal stack. `verify_fit.py` checks this.
+  the 356 × 80 mm keyboard and under-mounted 120 × 90 mm control board fit the
+  400 × 170 mm panel, with a ~32 mm internal stack. `verify_fit.py` checks this.
 - **EMD package:** the combined project imports both netlists and routed PCBs,
   aligns the control board under the keyboard, validates 170 parts / 522
   connections, and produces a verified package.

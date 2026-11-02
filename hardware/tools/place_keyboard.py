@@ -65,26 +65,18 @@ def main() -> None:
     for i in range(16):
         placement[f"D{i + 1}"] = (white_x(i), 70 + 5.08, 0)
         placement[f"D{i + 17}"] = (white_x(i), 40 + 5.08, 0)
-        placement[f"R{i + 1}"] = (white_x(i), 52, 0)
-        placement[f"R{i + 17}"] = (white_x(i), 58, 0)
+        # LEDs sit between the switch rows; resistors sit in the switch gaps.
+        placement[f"R{i + 1}"] = (white_x(i) + 9.525, 70, 90)
+        placement[f"R{i + 17}"] = (white_x(i) + 9.525, 40, 90)
 
-    # Bottom service strip.
-    placement["J1"] = (10, 88, 0)
-    for i, x in enumerate((40, 70, 100, 130)):
-        placement[f"U{i + 1}"] = (x, 88, 0)
-    for i, x in enumerate((160, 175, 190, 205)):
-        placement[f"C{i + 1}"] = (x, 88, 0)
+    # Service parts in the inter-row gap and top-left corner.
+    placement["J1"] = (30, 5, 0)
+    for i, x in enumerate((60, 120, 180, 240)):
+        placement[f"U{i + 1}"] = (x, 55, 0)
+    for i, x in enumerate((280, 295, 310, 325)):
+        placement[f"C{i + 1}"] = (x, 55, 0)
 
-    board = pcbnew.LoadBoard(str(BOARD))
-    for fp in list(board.GetFootprints()):
-        if fp.GetReference().startswith("H"):
-            continue
-        board.Remove(fp)
-    board.GetDesignSettings().m_MinClearance = pcbnew.FromMM(0.15)
-    board.GetDesignSettings().m_HoleClearance = pcbnew.FromMM(0.15)
-    board.GetDesignSettings().m_NetSettings.GetDefaultNetclass().SetClearance(
-        pcbnew.FromMM(0.15))
-    nets = {}
+    loaded = []
     for comp in components:
         ref = comp["ref"]
         if ref.startswith("SW"):
@@ -115,6 +107,16 @@ def main() -> None:
             for item in fp.GraphicalItems():
                 if item.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS):
                     item.SetLayer(pcbnew.F_Fab)
+        loaded.append((comp, fp))
+
+    board = pcbnew.LoadBoard(str(BOARD))
+    for fp in list(board.GetFootprints()):
+        if fp.GetReference().startswith("H"):
+            continue
+        board.Remove(fp)
+    nets = {}
+    for comp, fp in loaded:
+        ref = comp["ref"]
         board.Add(fp)
         for pad in fp.Pads():
             net_name = pin_nets.get((ref, pad.GetNumber()))

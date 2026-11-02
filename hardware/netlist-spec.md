@@ -118,9 +118,9 @@ Unused ADS1115 inputs → GND. ADC_VREF (pin 35) NC.
 
 ---
 
-## Keyboard board — 356 × 100 mm
+## Keyboard board — 356 × 80 mm
 
-M3 holes at (5,5) (351,5) (5,95) (351,95).
+M3 holes at (5,5) (351,5) (5,75) (351,75).
 45 MX hot-swap sockets (Kailh, THT; `nsr1_fp:SW_Hotswap_Kailh_MX_Plated_1.00u`): SH-L, 16 whites, 11 blacks, SH-R,
 16 step-row keys. Whites at 19.05 mm pitch; blacks on the upper row (y offset
 ≈ −22 mm) at the piano gaps {1,2, 4,5,6, 8,9, 11,12,13} plus one far-right
@@ -128,9 +128,9 @@ position; shifts at the row ends. Step row sits below the piano row at
 19.05 mm pitch. Gateron Red / Silent Red, 3 mm LED slot in whites and step
 keys.
 
-> The rev A outline was 356 × 62 mm with only the piano row; rev B2 adds the
-> step row and grows the board to 356 × 100 mm. The `.kicad_pcb` outline is
-> updated with the layout pass.
+> The rev A outline was 356 × 62 mm with only the piano row. Rev B2 adds the
+> step row and initially used 356 × 100 mm; the panel-fit pass compacts the
+> service parts into the inter-row gaps and uses 356 × 80 mm.
 
 | Ref | Part | Role |
 |---|---|---|
@@ -192,5 +192,5 @@ ENC1–ENC8.
   4 encoders, 16 LEDs, 90 × 70 control board + 356 × 62 keyboard board.
 - **Rev B** — dedicated 16-key step row, 4× MCP23017, 2 pots, 4 encoders.
 - **Rev B2** — 8 encoders (4 pageable + 4 ADSR), 2× ADS1115, 32 LEDs,
-  5× MCP23017 (board split), 120 × 90 control board + 356 × 100 keyboard
+  5× MCP23017 (board split), 120 × 90 control board + 356 × 80 keyboard
   board.

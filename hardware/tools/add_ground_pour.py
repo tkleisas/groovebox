@@ -7,7 +7,7 @@ import pcbnew
 
 BOARDS = {
     "control": ("/work/hardware/control/control.kicad_pcb", 120, 90, True),
-    "keyboard": ("/work/hardware/keyboard/keyboard.kicad_pcb", 356, 100, False),
+    "keyboard": ("/work/hardware/keyboard/keyboard.kicad_pcb", 356, 80, True),
 }
 
 

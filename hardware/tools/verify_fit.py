@@ -8,8 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PANEL = (400.0, 170.0)
-KEYBOARD_ORIGIN = (22.0, 65.0)
-CONTROL_ORIGIN = (140.0, 70.0)
+KEYBOARD_ORIGIN = (22.0, 90.0)
+CONTROL_ORIGIN = (140.0, 65.0)
 LINE = re.compile(
     r"\(gr_line\s+\(start\s+([-\d.]+)\s+([-\d.]+)\)\s+"
     r"\(end\s+([-\d.]+)\s+([-\d.]+)\)(.*?)\(layer \"Edge\.Cuts\"\)",
@@ -36,8 +36,8 @@ def main() -> None:
     keyboard = board_size(ROOT / "hardware" / "keyboard" / "keyboard.kicad_pcb")
     control = board_size(ROOT / "hardware" / "control" / "control.kicad_pcb")
     errors = []
-    if keyboard != (356.0, 100.0):
-        errors.append(f"keyboard is {keyboard}, expected (356.0, 100.0)")
+    if keyboard != (356.0, 80.0):
+        errors.append(f"keyboard is {keyboard}, expected (356.0, 80.0)")
     if control != (120.0, 90.0):
         errors.append(f"control is {control}, expected (120.0, 90.0)")
     if not contains(PANEL, KEYBOARD_ORIGIN, keyboard):
@@ -51,7 +51,7 @@ def main() -> None:
     print(f"panel {PANEL[0]:.0f} x {PANEL[1]:.0f} mm")
     print(f"keyboard {keyboard[0]:.0f} x {keyboard[1]:.0f} mm at "
           f"{KEYBOARD_ORIGIN[0]:.0f},{KEYBOARD_ORIGIN[1]:.0f}")
-    print(f"control {control[0]:.0f} x {control[1]:.0f} mm under keyboard at "
+    print(f"control {control[0]:.0f} x {control[1]:.0f} mm under panel at "
           f"{CONTROL_ORIGIN[0]:.0f},{CONTROL_ORIGIN[1]:.0f}")
     print("vertical stack: panel 3 + keyboard 1.6 + switch 5 + standoff 10 + "
           "control 1.6 + Pico 11 = 32.2 mm")

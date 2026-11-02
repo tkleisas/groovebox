@@ -8,10 +8,10 @@ compatible.
 ## Panel and board positions
 
 - Faceplate/panel: **400 × 170 mm**.
-- Keyboard board: **356 × 100 mm**, placed at panel **(22, 65)**.
-- Control board: **120 × 90 mm**, mounted **under** the keyboard board at
-  panel **(140, 70)** on 10 mm standoffs.
-- The top 65 mm strip carries the screen, soft keys, encoders, pots, slider,
+- Keyboard board: **356 × 80 mm**, placed at panel **(22, 90)**.
+- Control board: **120 × 90 mm**, mounted under the keyboard/top-control area
+  at panel **(140, 65)** on 10 mm standoffs.
+- The top 90 mm strip carries the screen, soft keys, encoders, pots, slider,
   joystick, transport, and function keys; the keyboard/step rows sit below it.
 - Verify that all encoder, pot, slider, joystick, and function-key JST
   harnesses clear the keyboard board and its switch pins.
