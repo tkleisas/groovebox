@@ -53,7 +53,20 @@ docker run --rm -v "$PWD:/work" -w /work kicad/kicad:10.0 \
 
 Current result: **0 ERC errors** for both boards. Expected warnings:
 `lib_symbol_mismatch` from the embedded symbol copies (cosmetic; 92 control,
-75 keyboard). Empty-outline DRC is clean (0 violations).
+75 keyboard). Routed-board DRC is clean for both boards (0 violations,
+0 unconnected items).
+
+Generate Gerbers, drill files, position CSV, BOM, STEP, stats, and zip
+archives with:
+
+```bash
+hardware/tools/export_fabrication.sh
+```
+
+Outputs land in `hardware/fabrication/` and are gitignored; regenerate them
+from the routed boards when needed. The STEP export defaults to a board-only
+model because the KiCad container does not ship the 3D model library. Set
+`STEP_FLAGS="--subst-models"` when `kicad-packages3d` is mounted or installed.
 
 ## Current scope
 
