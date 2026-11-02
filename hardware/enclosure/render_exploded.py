@@ -285,7 +285,7 @@ def main():
     cam_data.ortho_scale = 860
     cam_data.clip_start = 1.0
     cam_data.clip_end = 5000.0
-    cam.location = (-150, -450, 1300)
+    cam.location = (-150, 0, 1400)
     target = bpy.data.objects.new("target", None)
     bpy.context.collection.objects.link(target)
     target.location = (-150, 0, 90)
