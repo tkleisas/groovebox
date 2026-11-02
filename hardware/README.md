@@ -68,7 +68,7 @@ Current result: **0 ERC errors** for both boards. Expected warnings:
   clear the eight encoder headers.
 - **Keyboard board:** all 45 switches, 32 LEDs, 32 resistors, 3 key expanders,
   HT16K33, link, and decoupling placed with
-  `hardware/tools/place_keyboard.py`; DRC reports 0 violations (222 unrouted
-  ratsnest connections remain).
-- **Not yet done:** keyboard routing, fabrication outputs, and final review of
-  the auto-routed control board.
+  `hardware/tools/place_keyboard.py`, then routed with Freerouting; DRC
+  reports 0 violations and 0 unconnected items.
+- **Not yet done:** fabrication outputs and final review of the auto-routed
+  boards.
