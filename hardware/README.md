@@ -78,10 +78,12 @@ model because the KiCad container does not ship the 3D model library. Set
 - **Control board:** placed and routed with 0 DRC violations and 0 unconnected
   items. Routing was done with Freerouting 2.5 via Specctra DSN/SES at
   0.15 mm minimum track width/clearance; the board grew to 120 × 90 mm to
-  clear the eight encoder headers.
+  clear the eight encoder headers. Four M3 mounting-hole footprints are
+  present for EMD mechanical ports.
 - **Keyboard board:** all 45 switches, 32 LEDs, 32 resistors, 3 key expanders,
   HT16K33, link, and decoupling placed with
   `hardware/tools/place_keyboard.py`, then routed with Freerouting; DRC
-  reports 0 violations and 0 unconnected items.
+  reports 0 violations and 0 unconnected items. Four M3 mounting-hole
+  footprints are present for EMD mechanical ports.
 - **Not yet done:** fabrication outputs and final review of the auto-routed
   boards.

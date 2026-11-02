@@ -14,6 +14,10 @@ NETLISTS = {
     "control": ROOT / "hardware" / "control" / "control.net.xml",
     "keyboard": ROOT / "hardware" / "keyboard" / "keyboard.net.xml",
 }
+PCB_FILES = {
+    "control": ROOT / "hardware" / "control" / "control.kicad_pcb",
+    "keyboard": ROOT / "hardware" / "keyboard" / "keyboard.kicad_pcb",
+}
 
 
 def emd_command(explicit):
@@ -51,6 +55,13 @@ def main():
             project = work / f"{name}.json"
             run = subprocess.run(
                 command + ["import", "kicad", str(netlist), "--out", str(project)],
+                text=True, capture_output=True)
+            print(run.stdout.strip() or run.stderr.strip())
+            if run.returncode != 0:
+                raise SystemExit(run.returncode)
+            run = subprocess.run(
+                command + ["import", "kicad-pcb", str(PCB_FILES[name]),
+                           "--project", str(project), "--out", str(project)],
                 text=True, capture_output=True)
             print(run.stdout.strip() or run.stderr.strip())
             if run.returncode != 0:

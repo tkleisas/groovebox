@@ -89,6 +89,8 @@ def main() -> None:
 
     board = pcbnew.LoadBoard(str(BOARD))
     for fp in list(board.GetFootprints()):
+        if fp.GetReference().startswith("H"):
+            continue
         board.Remove(fp)
     board.GetDesignSettings().m_MinClearance = pcbnew.FromMM(0.15)
     board.GetDesignSettings().m_NetSettings.GetDefaultNetclass().SetClearance(pcbnew.FromMM(0.15))
