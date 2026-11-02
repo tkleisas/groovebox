@@ -62,13 +62,13 @@ Current result: **0 ERC errors** for both boards. Expected warnings:
   keyboard/UART links.
 - **Keyboard board:** 45 MX hot-swap sockets (29 piano/shift + 16 step row),
   3× MCP23017, HT16K33, 32 LEDs.
-- **Control placement:** initial floorplan done with
-  `hardware/tools/place_control.py`; DRC reports 0 violations (156 unrouted
-  ratsnest connections remain). The board grew to 120 × 90 mm to clear the
-  eight encoder headers.
-- **Keyboard placement:** all 45 switches, 32 LEDs, 32 resistors, 3 key
-  expanders, HT16K33, link, and decoupling placed with
+- **Control board:** placed and routed with 0 DRC violations and 0 unconnected
+  items. Routing was done with Freerouting 2.5 via Specctra DSN/SES at
+  0.15 mm minimum track width/clearance; the board grew to 120 × 90 mm to
+  clear the eight encoder headers.
+- **Keyboard board:** all 45 switches, 32 LEDs, 32 resistors, 3 key expanders,
+  HT16K33, link, and decoupling placed with
   `hardware/tools/place_keyboard.py`; DRC reports 0 violations (222 unrouted
   ratsnest connections remain).
-- **Not yet done:** routing both boards, fabrication outputs, and final DRC on
-  the routed boards.
+- **Not yet done:** keyboard routing, fabrication outputs, and final review of
+  the auto-routed control board.
