@@ -50,16 +50,16 @@ the only I²C pull-ups.
 
 ---
 
-## Control board — 100 × 80 mm
+## Control board — 120 × 90 mm
 
 M3 mounting holes (3.2 mm) at (5,5) (95,5) (5,75) (95,75).
 Pico on 2×20 machined female headers (J1A pins 1–20, J1B pins 21–40),
 module micro-USB flush with the **bottom edge** (cable to Pi OTG), BOOTSEL
 reachable through an enclosure hole.
 
-> The rev A outline was 90 × 70 mm; rev B2 grows it to 100 × 80 mm for the
-> fifth MCP23017 and eight encoder connectors. The `.kicad_pcb` outline is
-> updated with the layout pass.
+> The rev A outline was 90 × 70 mm. Rev B2 initially targeted 100 × 80 mm;
+> the placement pass grows it to 120 × 90 mm so the eight encoder headers and
+> five analog/key connectors fit without courtyard collisions.
 
 ### Pico pin map
 
@@ -192,5 +192,5 @@ ENC1–ENC8.
   4 encoders, 16 LEDs, 90 × 70 control board + 356 × 62 keyboard board.
 - **Rev B** — dedicated 16-key step row, 4× MCP23017, 2 pots, 4 encoders.
 - **Rev B2** — 8 encoders (4 pageable + 4 ADSR), 2× ADS1115, 32 LEDs,
-  5× MCP23017 (board split), 100 × 80 control board + 356 × 100 keyboard
+  5× MCP23017 (board split), 120 × 90 control board + 356 × 100 keyboard
   board.

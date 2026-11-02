@@ -33,7 +33,7 @@ gcc -std=c11 -Ipanel-fw/src hardware/tools/check_board_config.c -o /tmp/check_bo
 /tmp/check_board_config
 ```
 
-The board outlines are updated to rev B2: control 100 × 80 mm, keyboard
+The board outlines are updated to rev B2: control 120 × 90 mm, keyboard
 356 × 100 mm. Placement and routing are hand-owned and remain to be done. The
 MX hot-swap footprint is vendored from the keyswitch-kicad-library
 (`nsr1_fp`, CC-BY-SA 4.0) and is assigned to all 45 switch symbols.
@@ -59,5 +59,9 @@ Current result: **0 ERC errors** for both boards. Expected warnings:
   keyboard/UART links.
 - **Keyboard board:** 45 MX hot-swap sockets (29 piano/shift + 16 step row),
   3× MCP23017, HT16K33, 32 LEDs.
-- **Not yet done:** placement, routing, fabrication outputs, and final DRC on
-  the routed boards. Open the generated files in KiCad 10 for review.
+- **Control placement:** initial floorplan done with
+  `hardware/tools/place_control.py`; DRC reports 0 violations (156 unrouted
+  ratsnest connections remain). The board grew to 120 × 90 mm to clear the
+  eight encoder headers.
+- **Not yet done:** control routing, keyboard placement/routing, fabrication
+  outputs, and final DRC on routed boards.
