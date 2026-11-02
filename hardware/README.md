@@ -15,6 +15,9 @@ python3 hardware/tools/verify_schematics.py
 # In the KiCad 10 container:
 python3 hardware/tools/place_control.py
 python3 hardware/tools/place_keyboard.py
+python3 hardware/tools/add_ground_pour.py control
+python3 hardware/tools/add_ground_pour.py keyboard
+python3 hardware/tools/verify_fit.py
 ```
 
 `gen_schematics.py` uses the KiCad 10 symbol definitions embedded in the
@@ -27,6 +30,7 @@ Export netlists and validate them with EMD:
 ```bash
 python3 hardware/tools/export_netlist.py
 python3 hardware/tools/verify_emd.py --emd /path/to/emd
+python3 hardware/tools/verify_emd.py --package-dir hardware/emd-packages
 ```
 
 Check the firmware map against the five-expander contract:
@@ -85,5 +89,10 @@ model because the KiCad container does not ship the 3D model library. Set
   `hardware/tools/place_keyboard.py`, then routed with Freerouting; DRC
   reports 0 violations and 0 unconnected items. Four M3 mounting-hole
   footprints are present for EMD mechanical ports.
-- **Not yet done:** fabrication outputs and final review of the auto-routed
-  boards.
+- **Ground pour:** both boards have a filled B.Cu GND zone; the control board
+  uses solid pad connections, the keyboard board uses thermal reliefs.
+- **Mechanical envelope:** see [`enclosure-spec.md`](enclosure-spec.md);
+  the keyboard and under-mounted control board fit the 400 × 170 mm panel,
+  with a ~32 mm internal stack. `verify_fit.py` checks this.
+- **Not yet done:** final electrical/thermal review of the auto-routed boards,
+  and a printable enclosure model.

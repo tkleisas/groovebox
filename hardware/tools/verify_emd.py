@@ -42,6 +42,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--emd", help="path to the emd executable")
     parser.add_argument("--keep", help="copy generated projects here")
+    parser.add_argument("--package-dir", help="write verified EMD packages here")
     args = parser.parse_args()
     command = emd_command(args.emd)
     if command is None:
@@ -71,6 +72,20 @@ def main():
             print(run.stdout.strip() or run.stderr.strip())
             if run.returncode != 0:
                 raise SystemExit(run.returncode)
+            if args.package_dir:
+                package = Path(args.package_dir) / name
+                run = subprocess.run(
+                    command + ["package", "--project", str(project),
+                               "--out-dir", str(package)],
+                    text=True, capture_output=True)
+                print(run.stdout.strip() or run.stderr.strip())
+                if run.returncode != 0:
+                    raise SystemExit(run.returncode)
+                run = subprocess.run(command + ["package", "verify", "--dir", str(package)],
+                                     text=True, capture_output=True)
+                print(run.stdout.strip() or run.stderr.strip())
+                if run.returncode != 0:
+                    raise SystemExit(run.returncode)
         if args.keep:
             target = Path(args.keep)
             target.mkdir(parents=True, exist_ok=True)
