@@ -97,5 +97,6 @@ model because the KiCad container does not ship the 3D model library. Set
 - **EMD package:** the combined project imports both netlists and routed PCBs,
   aligns the control board under the keyboard, validates 170 parts / 522
   connections, and produces a verified package.
-- **Not yet done:** final electrical/thermal review of the auto-routed boards,
-  and a printable enclosure model.
+- **Enclosure:** a first printable tray is in
+  [`enclosure/`](enclosure/README.md); panel cutouts are still to be modelled.
+- **Power/thermal:** see [`power-thermal-review.md`](power-thermal-review.md).

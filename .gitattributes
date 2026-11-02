@@ -2,3 +2,5 @@
 *.sh text eol=lf
 *.png binary
 *.img.xz binary
+hardware/enclosure/*.step binary
+hardware/enclosure/*.stl binary

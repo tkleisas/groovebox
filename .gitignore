@@ -31,6 +31,7 @@ nsr2/hardware/**/*_outline.png
 nsr2/hardware/**/*_sch.pdf
 nsr2/tools/__pycache__/
 hardware/tools/__pycache__/
+hardware/enclosure/__pycache__/
 hardware/**/*.kicad_prl
 *-erc*.json
 *-drc*.json
