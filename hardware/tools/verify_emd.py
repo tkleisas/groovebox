@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import the generated NSR-1 netlists into EMD and validate both projects."""
+"""Import the four NSR-1 netlists/PCBs into EMD and validate the combined project."""
 from __future__ import annotations
 
 import argparse
@@ -15,10 +15,20 @@ ROOT = Path(__file__).resolve().parents[2]
 NETLISTS = {
     "control": ROOT / "hardware" / "control" / "control.net.xml",
     "keyboard": ROOT / "hardware" / "keyboard" / "keyboard.net.xml",
+    "brain": ROOT / "hardware" / "brain" / "brain.net.xml",
+    "power": ROOT / "hardware" / "power" / "power.net.xml",
 }
 PCB_FILES = {
     "control": ROOT / "hardware" / "control" / "control.kicad_pcb",
     "keyboard": ROOT / "hardware" / "keyboard" / "keyboard.kicad_pcb",
+    "brain": ROOT / "hardware" / "brain" / "brain.kicad_pcb",
+    "power": ROOT / "hardware" / "power" / "power.kicad_pcb",
+}
+BOARD_LAYOUT = {
+    "CTRL": ("control", (0.205, 0.115, -0.020)),
+    "KBD": ("keyboard", (0.1789, 0.126, 0.0)),
+    "BRAIN": ("brain", (0.335, 0.045, -0.020)),
+    "PWR": ("power", (0.340, 0.130, -0.020)),
 }
 
 
@@ -88,21 +98,24 @@ def _prefix_ids(project, prefix, id_map):
     return parts, nets, boards, connections
 
 
-def merge_projects(control, keyboard, output):
-    combined = json.loads(json.dumps(control))
+def merge_projects(projects, output):
+    combined = json.loads(json.dumps(projects["control"]))
     combined["id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, "groovebox/nsr1/combined"))
     combined["key"] = "groovebox_nsr1"
     combined["name"] = "groovebox NSR-1"
     combined["description"] = (
-        "Combined NSR-1 control and keyboard boards imported from KiCad.")
+        "Combined NSR-1 control, keyboard, Pi carrier, and power boards "
+        "imported from KiCad.")
     combined["metadata"] = {
-        "sources": ["control", "keyboard"],
+        "sources": list(NETLISTS),
         "firmware_map": "panel-fw/src/board_config.h",
+        "board_layout": {prefix: label for prefix, (label, _pose)
+                         in BOARD_LAYOUT.items()},
     }
     id_map = {}
     parts, nets, boards, connections = [], [], [], []
-    for prefix, project in (("CTRL", control), ("KBD", keyboard)):
-        p, n, b, c = _prefix_ids(project, prefix, id_map)
+    for prefix, (name, _pose) in BOARD_LAYOUT.items():
+        p, n, b, c = _prefix_ids(projects[name], prefix, id_map)
         parts += p
         nets += n
         boards += b
@@ -111,14 +124,13 @@ def merge_projects(control, keyboard, output):
     combined["connections"] = connections
     combined["electrical"] = {"nets": nets, "boards": boards}
     by_id = {part["id"]: part for part in parts}
-    for prefix, source, z in (("CTRL", control, -0.02), ("KBD", keyboard, 0.0)):
-        board = source["electrical"]["boards"][0]
+    for prefix, (name, pose) in BOARD_LAYOUT.items():
+        board = projects[name]["electrical"]["boards"][0]
         part_id = id_map[prefix]["parts"][board["part_id"]]
-        center = (0.2, 0.11) if prefix == "CTRL" else (0.1789, 0.126)
-        by_id[part_id]["pose"] = {"pos": [center[0], center[1], z]}
+        by_id[part_id]["pose"] = {"pos": list(pose)}
     combined["mechanical"] = {
         "assembly_root_part_id": id_map["CTRL"]["parts"][
-            control["mechanical"]["assembly_root_part_id"]]
+            projects["control"]["mechanical"]["assembly_root_part_id"]]
     }
     Path(output).parent.mkdir(parents=True, exist_ok=True)
     Path(output).write_text(json.dumps(combined, indent=2) + "\n",
@@ -176,10 +188,11 @@ def main():
                 if run.returncode != 0:
                     raise SystemExit(run.returncode)
         if args.combined:
-            combined = merge_projects(
-                json.loads((work / "control.json").read_text(encoding="utf-8")),
-                json.loads((work / "keyboard.json").read_text(encoding="utf-8")),
-                args.combined)
+            projects = {
+                name: json.loads((work / f"{name}.json").read_text(encoding="utf-8"))
+                for name in NETLISTS
+            }
+            combined = merge_projects(projects, args.combined)
             run = subprocess.run(command + ["validate", str(combined)],
                                  text=True, capture_output=True)
             print(run.stdout.strip() or run.stderr.strip())

@@ -99,8 +99,9 @@ The NSR-1 hardware is imported and validated with
 [**ElectroMechanicalDesigner (EMD)**](https://github.com/tkleisas/ElectroMechanicalDesigner):
 
 - `hardware/tools/export_netlist.py` exports KiCad XML netlists.
-- `hardware/tools/verify_emd.py` imports both netlists and routed PCBs,
-  validates them, and builds a combined **170-part / 522-connection** project.
+- `hardware/tools/verify_emd.py` imports all four netlists and routed PCBs
+  (control, keyboard, Pi carrier, power), validates them, and builds a combined
+  **237-part / 735-connection** project.
 - The combined project is placed in the 400 × 170 mm panel envelope and its
   package is verified with `emd package verify`.
 - Generated projects/packages live in `hardware/emd-packages/` (gitignored);

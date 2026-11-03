@@ -150,10 +150,10 @@ model because the KiCad container does not ship the 3D model library. Set
 - **Mechanical envelope:** see [`enclosure-spec.md`](enclosure-spec.md);
   the 356 × 80 mm keyboard and under-mounted 130 × 100 mm control board fit the
   400 × 170 mm panel, with a ~32 mm internal stack. `verify_fit.py` checks this.
-- **EMD package:** the current combined project imports the control and
-  keyboard netlists/PCBs, aligns the control board under the keyboard, validates
-  170 parts / 522 connections, and produces a verified package. The brain and
-  power boards join the combined package after they are routed.
+- **EMD package:** the combined project imports all four netlists/PCBs
+  (control, keyboard, brain carrier, power), places them in the 400 × 170 mm
+  envelope, validates 237 parts / 735 connections, and produces a verified
+  package.
 - **Enclosure:** printable tray and cutout faceplate are in
   [`enclosure/`](enclosure/README.md); rear I/O openings remain.
 - **Power/thermal:** see [`power-thermal-review.md`](power-thermal-review.md).
